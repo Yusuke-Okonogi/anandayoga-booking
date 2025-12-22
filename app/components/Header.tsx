@@ -219,146 +219,146 @@ export default function Header() {
             </div>
           </div>
         </header>
+      </div>
 
-        {/* 全画面モーダルメニュー */}
-        {isMenuOpen && (
-          <div className="fixed inset-0 z-[9999] bg-[#F7F5F0] animate-in fade-in duration-200 flex flex-col">
-            
-            {/* モーダル内にも管理者バーを表示して高さズレを防ぐ */}
-            {isAdmin && (
-              <div className="bg-stone-800 text-white text-xs py-1 px-4 text-center font-bold tracking-wider flex-shrink-0">
-                🔧 管理者モードでログイン中
-              </div>
-            )}
-
-            {/* モーダルヘッダー */}
-            <div className="w-full border-b border-stone-200 bg-[#F7F5F0] flex-shrink-0">
-               <div className="max-w-6xl mx-auto px-4 sm:px-8 h-16 flex justify-between items-center">
-                  <div className="h-8 sm:h-10 w-auto opacity-50 grayscale">
-                    <img src="/logo.png" alt="Anandayoga" className="h-full w-auto object-contain" />
-                  </div>
-                  
-                  {/* 閉じるボタン */}
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <button 
-                      onClick={closeMenu}
-                      className="p-2 rounded-lg text-stone-500 hover:bg-stone-200 transition focus:outline-none flex-shrink-0 w-10 h-10 flex items-center justify-center"
-                      aria-label="閉じる"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M18 6 6 18" />
-                        <path d="m6 6 12 12" />
-                      </svg>
-                    </button>
-                  </div>
-               </div>
+      {/* 全画面モーダルメニュー */}
+      {isMenuOpen && (
+        <div className="fixed inset-0 z-[9999] bg-[#F7F5F0] animate-in fade-in duration-200 flex flex-col">
+          
+          {/* モーダル内にも管理者バーを表示して高さズレを防ぐ */}
+          {isAdmin && (
+            <div className="bg-stone-800 text-white text-xs py-1 px-4 text-center font-bold tracking-wider flex-shrink-0">
+              🔧 管理者モードでログイン中
             </div>
+          )}
 
-            <div className="flex-1 overflow-y-auto p-4 pb-20">
-              <div className="max-w-md mx-auto grid gap-6">
-                
-                {/* 上部アクションボタンエリア */}
-                <div className="flex flex-col gap-2">
-                   {user ? (
-                     <div className="flex gap-2 w-full">
-                       <Link 
-                         href="/mypage" 
-                         onClick={closeMenu} 
-                         className="flex-1 bg-[#EEA51A] text-white font-bold py-2.5 rounded-xl text-center shadow-md hover:bg-[#D99000] transition flex items-center justify-center gap-2 text-sm"
-                       >
-                         {/* アイコン追加 */}
-                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                         <span>マイページ</span>
-                       </Link>
-                       <button 
-                         onClick={handleLogout} 
-                         className="flex-1 bg-white text-stone-500 font-bold py-2.5 rounded-xl border-2 border-stone-200 hover:bg-stone-50 transition text-center text-sm"
-                       >
-                         ログアウト
-                       </button>
-                     </div>
-                   ) : (
-                     <Link 
-                       href="/login" 
-                       onClick={closeMenu} 
-                       className="w-full bg-[#EEA51A] text-white font-bold py-2.5 rounded-xl text-center shadow-md hover:bg-[#D99000] transition flex items-center justify-center gap-2 text-sm"
-                     >
-                       <span className="text-lg">🔐</span> ログイン / 新規登録
-                     </Link>
-                   )}
+          {/* モーダルヘッダー */}
+          <div className="w-full border-b border-stone-200 bg-[#F7F5F0] flex-shrink-0">
+             <div className="max-w-6xl mx-auto px-4 sm:px-8 h-16 flex justify-between items-center">
+                <div className="h-8 sm:h-10 w-auto opacity-50 grayscale">
+                  <img src="/logo.png" alt="Anandayoga" className="h-full w-auto object-contain" />
                 </div>
+                
+                {/* 閉じるボタン */}
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <button 
+                    onClick={closeMenu}
+                    className="p-2 rounded-lg text-stone-500 hover:bg-stone-200 transition focus:outline-none flex-shrink-0 w-10 h-10 flex items-center justify-center"
+                    aria-label="閉じる"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6 6 18" />
+                      <path d="m6 6 12 12" />
+                    </svg>
+                  </button>
+                </div>
+             </div>
+          </div>
 
-                {/* ユーザーメニュー */}
-                <div className="space-y-2">
-                  <h3 className="text-[10px] font-bold text-stone-400 tracking-wider mb-1 px-2">MENU</h3>
-                  <ul className="space-y-1">
+          <div className="flex-1 overflow-y-auto p-4 pb-20">
+            <div className="max-w-md mx-auto grid gap-6">
+              
+              {/* 上部アクションボタンエリア */}
+              <div className="flex flex-col gap-2">
+                 {user ? (
+                   <div className="flex gap-2 w-full">
+                     <Link 
+                       href="/mypage" 
+                       onClick={closeMenu} 
+                       className="flex-1 bg-[#EEA51A] text-white font-bold py-2.5 rounded-xl text-center shadow-md hover:bg-[#D99000] transition flex items-center justify-center gap-2 text-sm"
+                     >
+                       {/* アイコン追加 */}
+                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                       <span>マイページ</span>
+                     </Link>
+                     <button 
+                       onClick={handleLogout} 
+                       className="flex-1 bg-white text-stone-500 font-bold py-2.5 rounded-xl border-2 border-stone-200 hover:bg-stone-50 transition text-center text-sm"
+                     >
+                       ログアウト
+                     </button>
+                   </div>
+                 ) : (
+                   <Link 
+                     href="/login" 
+                     onClick={closeMenu} 
+                     className="w-full bg-[#EEA51A] text-white font-bold py-2.5 rounded-xl text-center shadow-md hover:bg-[#D99000] transition flex items-center justify-center gap-2 text-sm"
+                   >
+                     <span className="text-lg">🔐</span> ログイン / 新規登録
+                   </Link>
+                 )}
+              </div>
+
+              {/* ユーザーメニュー */}
+              <div className="space-y-2">
+                <h3 className="text-[10px] font-bold text-stone-400 tracking-wider mb-1 px-2">MENU</h3>
+                <ul className="space-y-1">
+                  <li>
+                    <Link href="/" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                      <span className="text-lg w-6 text-center">📅</span> 予約カレンダー
+                    </Link>
+                  </li>
+                  {/* メニュー内マイページリンク（アイコン化） */}
+                  {user && (
                     <li>
-                      <Link href="/" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
-                        <span className="text-lg w-6 text-center">📅</span> 予約カレンダー
+                      <Link href="/mypage" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                        <span className="w-6 flex justify-center text-stone-700">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        </span>
+                        マイページ
                       </Link>
                     </li>
-                    {/* メニュー内マイページリンク（アイコン化） */}
-                    {user && (
-                      <li>
-                        <Link href="/mypage" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
-                          <span className="w-6 flex justify-center text-stone-700">
-                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                          </span>
-                          マイページ
-                        </Link>
-                      </li>
-                    )}
+                  )}
+                  <li>
+                    <button 
+                      onClick={() => setContactModalOpen(true)} 
+                      className="w-full text-left text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition"
+                    >
+                      <span className="text-lg w-6 text-center">✉️</span> お問い合わせ
+                    </button>
+                  </li>
+                  <li>
+                    <a href="https://ananda-yogaschool.com/" target="_blank" rel="noopener noreferrer" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                      <span className="text-lg w-6 text-center">🌐</span> 公式サイト
+                      <svg className="w-3 h-3 text-stone-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+
+              {/* 管理者メニュー */}
+              {isAdmin && (
+                <div className="space-y-2 pt-4 border-t border-stone-200">
+                  <h3 className="text-[10px] font-bold text-stone-400 tracking-wider mb-1 px-2">ADMIN MENU</h3>
+                  <ul className="space-y-1">
                     <li>
-                      <button 
-                        onClick={() => setContactModalOpen(true)} 
-                        className="w-full text-left text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition"
-                      >
-                        <span className="text-lg w-6 text-center">✉️</span> お問い合わせ
-                      </button>
+                      <Link href="/admin/checkin" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                        <span className="text-lg w-6 text-center">📋</span> 予約・チェックイン
+                      </Link>
                     </li>
                     <li>
-                      <a href="https://ananda-yogaschool.com/" target="_blank" rel="noopener noreferrer" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
-                        <span className="text-lg w-6 text-center">🌐</span> 公式サイト
-                        <svg className="w-3 h-3 text-stone-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                      </a>
+                      <Link href="/admin?tab=lessons" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                        <span className="text-lg w-6 text-center">✏️</span> 予約管理 (クラス登録)
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/admin?tab=users" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                        <span className="text-lg w-6 text-center">👥</span> ユーザー管理
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/admin?tab=plans" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                        <span className="text-lg w-6 text-center">💳</span> プラン管理
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/admin?tab=announcements" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                        <span className="text-lg w-6 text-center">🔔</span> お知らせ管理
+                      </Link>
                     </li>
                   </ul>
                 </div>
-
-                {/* 管理者メニュー */}
-                {isAdmin && (
-                  <div className="space-y-2 pt-4 border-t border-stone-200">
-                    <h3 className="text-[10px] font-bold text-stone-400 tracking-wider mb-1 px-2">ADMIN MENU</h3>
-                    <ul className="space-y-1">
-                      <li>
-                        <Link href="/admin/checkin" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
-                          <span className="text-lg w-6 text-center">📋</span> 予約・チェックイン
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/admin?tab=lessons" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
-                          <span className="text-lg w-6 text-center">✏️</span> 予約管理 (クラス登録)
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/admin?tab=users" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
-                          <span className="text-lg w-6 text-center">👥</span> ユーザー管理
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/admin?tab=plans" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
-                          <span className="text-lg w-6 text-center">💳</span> プラン管理
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/admin?tab=announcements" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
-                          <span className="text-lg w-6 text-center">🔔</span> お知らせ管理
-                        </Link>
-                      </li>
-                    </ul>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
         </div>
