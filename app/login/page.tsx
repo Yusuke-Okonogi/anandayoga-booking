@@ -17,9 +17,19 @@ export default function LoginPage() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ★追加: 同意チェック状態
+  const [agreed, setAgreed] = useState(false);
+
   // メールログイン・登録・リセット処理
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // ★追加: 新規登録時は同意必須
+    if (mode === 'signup' && !agreed) {
+      setMessage('利用規約とプライバシーポリシーへの同意が必要です。');
+      return;
+    }
+
     setLoading(true);
     setMessage('');
 
@@ -51,18 +61,17 @@ export default function LoginPage() {
         }, 1000);
 
       } else if (mode === 'reset') {
-        // --- パスワードリセット（ビジター移行） ---
+        // --- パスワードリセット ---
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth/update-password`, // ※後で設定が必要な場合があります
+          redirectTo: `${window.location.origin}/auth/update-password`,
         });
         if (error) throw error;
         setMessage('パスワード設定メールを送信しました。\nメール内のリンクから設定を行ってください。');
       }
     } catch (error: any) {
-      // ビジターが新規登録しようとした場合のエラーハンドリング
       if (mode === 'signup' && error.message.includes('already registered')) {
         setMessage('このメールアドレスは既にビジターとして登録されています。「パスワード設定」からアカウントを有効化してください。');
-        setMode('reset'); // リセットモードに誘導
+        setMode('reset');
       } else {
         setMessage(`エラー: ${error.message}`);
       }
@@ -73,6 +82,8 @@ export default function LoginPage() {
 
   // LINEログイン処理
   const handleLineLogin = () => {
+    // LINEログインの場合も、本来は同意が必要ですが、今回は簡略化のためスキップ
+    // (厳密にはLINEログインボタンの近くに「ログインすることで規約に同意したものとみなします」と書くのが一般的です)
     setLoading(true);
     window.location.href = `/api/auth/line`;
   };
@@ -92,7 +103,7 @@ export default function LoginPage() {
            </p>
         </div>
 
-        {/* LINEログインボタン (リセットモード以外で表示) */}
+        {/* LINEログインボタン */}
         {mode !== 'reset' && (
           <div className="mb-8">
             <button
@@ -115,7 +126,6 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={handleAuth} className="space-y-5">
-          {/* 新規登録時のみ名前入力 */}
           {mode === 'signup' && (
             <div>
               <label className="block text-xs font-bold text-stone-600 mb-1 ml-1">お名前</label>
@@ -142,7 +152,6 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* リセットモード以外でパスワード入力 */}
           {mode !== 'reset' && (
             <div>
               <label className="block text-xs font-bold text-stone-600 mb-1 ml-1">パスワード</label>
@@ -157,22 +166,41 @@ export default function LoginPage() {
             </div>
           )}
 
+          {/* ★追加: 同意チェックボックス (新規登録時のみ表示) */}
+          {mode === 'signup' && (
+            <div className="flex items-start gap-2 pt-2">
+              <input 
+                type="checkbox" 
+                id="agree" 
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-1 w-4 h-4 text-[#EEA51A] border-stone-300 rounded focus:ring-[#EEA51A]"
+              />
+              <label htmlFor="agree" className="text-xs text-stone-500 leading-tight">
+                <a href="#" className="text-[#EEA51A] hover:underline">利用規約</a> と <a href="#" className="text-[#EEA51A] hover:underline">プライバシーポリシー</a> に同意します
+              </label>
+            </div>
+          )}
+
           {message && (
-            <div className={`text-sm text-center p-3 rounded-xl font-bold whitespace-pre-wrap ${message.includes('エラー') ? 'bg-red-50 text-red-600' : 'bg-[#FFF8E1] text-[#EEA51A]'}`}>
+            <div className={`text-sm text-center p-3 rounded-xl font-bold whitespace-pre-wrap ${message.includes('エラー') || message.includes('同意') ? 'bg-red-50 text-red-600' : 'bg-[#FFF8E1] text-[#EEA51A]'}`}>
               {message}
             </div>
           )}
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-stone-800 text-white font-bold py-4 rounded-xl hover:bg-[#EEA51A] transition disabled:opacity-50 shadow-lg mt-4"
+            disabled={loading || (mode === 'signup' && !agreed)} // 未同意ならボタン無効化
+            className={`w-full text-white font-bold py-4 rounded-xl transition shadow-lg mt-4 ${
+               loading || (mode === 'signup' && !agreed) 
+                 ? 'bg-stone-300 cursor-not-allowed' 
+                 : 'bg-stone-800 hover:bg-[#EEA51A]'
+            }`}
           >
             {loading ? '処理中...' : mode === 'login' ? 'ログイン' : mode === 'signup' ? '登録してはじめる' : '設定メールを送信'}
           </button>
         </form>
 
-        {/* モード切り替えリンク */}
         <div className="mt-8 text-center pt-6 border-t border-stone-100 flex flex-col gap-3">
           {mode === 'login' && (
             <>

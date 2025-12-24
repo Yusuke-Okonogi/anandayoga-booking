@@ -101,8 +101,6 @@ export default function Header() {
         }
       }
 
-      console.log('Sending contact email:', { userEmail, userName, subject: contactForm.subject });
-
       const res = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -225,7 +223,7 @@ export default function Header() {
       {isMenuOpen && (
         <div className="fixed inset-0 z-[9999] bg-[#F7F5F0] animate-in fade-in duration-200 flex flex-col">
           
-          {/* モーダル内にも管理者バーを表示して高さズレを防ぐ */}
+          {/* モーダル内にも管理者バーを表示 */}
           {isAdmin && (
             <div className="bg-stone-800 text-white text-xs py-1 px-4 text-center font-bold tracking-wider flex-shrink-0">
               🔧 管理者モードでログイン中
@@ -267,7 +265,6 @@ export default function Header() {
                        onClick={closeMenu} 
                        className="flex-1 bg-[#EEA51A] text-white font-bold py-2.5 rounded-xl text-center shadow-md hover:bg-[#D99000] transition flex items-center justify-center gap-2 text-sm"
                      >
-                       {/* アイコン追加 */}
                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                        <span>マイページ</span>
                      </Link>
@@ -332,27 +329,27 @@ export default function Header() {
                   <h3 className="text-[10px] font-bold text-stone-400 tracking-wider mb-1 px-2">ADMIN MENU</h3>
                   <ul className="space-y-1">
                     <li>
-                      <Link href="/admin/checkin" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                      <Link href="/admin/checkin" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition" prefetch={false}>
                         <span className="text-lg w-6 text-center">📋</span> 予約・チェックイン
                       </Link>
                     </li>
                     <li>
-                      <Link href="/admin?tab=lessons" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                      <Link href="/admin?tab=lessons" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition" prefetch={false}>
                         <span className="text-lg w-6 text-center">✏️</span> 予約管理 (クラス登録)
                       </Link>
                     </li>
                     <li>
-                      <Link href="/admin?tab=users" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                      <Link href="/admin?tab=users" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition" prefetch={false}>
                         <span className="text-lg w-6 text-center">👥</span> ユーザー管理
                       </Link>
                     </li>
                     <li>
-                      <Link href="/admin?tab=plans" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                      <Link href="/admin?tab=plans" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition" prefetch={false}>
                         <span className="text-lg w-6 text-center">💳</span> プラン管理
                       </Link>
                     </li>
                     <li>
-                      <Link href="/admin?tab=announcements" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
+                      <Link href="/admin?tab=announcements" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition" prefetch={false}>
                         <span className="text-lg w-6 text-center">🔔</span> お知らせ管理
                       </Link>
                     </li>

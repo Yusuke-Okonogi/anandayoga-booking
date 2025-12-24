@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter, useSearchParams } from 'next/navigation'; // ★修正: useSearchParamsを追加
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 // 型定義
@@ -25,9 +25,10 @@ type Ticket = { id: string; ticket_name: string; remaining_count: number; expire
 type Announcement = { id: string; title: string; content: string; target_tags: string[]; priority: number; created_at: string; link_url?: string; };
 type Profile = { id: string; member_number: number; email: string; full_name: string; phone: string | null; plan_id: string | null; plans: Plan | null; user_tickets: Ticket[]; line_user_id: string | null; notes: string | null; training_status: string | null; tags: string[] | null; };
 
-export default function AdminPage() {
+// 内部コンポーネント: 実際のコンテンツ
+function AdminContent() {
   const router = useRouter();
-  const searchParams = useSearchParams(); // ★追加: URLパラメータ取得用
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'lessons' | 'users' | 'plans' | 'announcements'>('lessons');
   
   const [message, setMessage] = useState('');
@@ -74,7 +75,7 @@ export default function AdminPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', target_tags: '', priority: 0, link_url: '' });
 
-  // ★追加: URLクエリパラメータからタブを切り替える処理
+  // URLクエリパラメータからタブを切り替える処理
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab && ['lessons', 'users', 'plans', 'announcements'].includes(tab)) {
@@ -86,9 +87,6 @@ export default function AdminPage() {
     const checkAdmin = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        // 未ログインならリダイレクトされるが、ヘッダーでログイン判定するため
-        // ここでのリダイレクトはコンポーネントのマウント後に行われる
-        // window.location.href = '/login'; 
         return; 
       }
       
@@ -100,7 +98,7 @@ export default function AdminPage() {
 
       if (profile?.role !== 'admin') {
         alert('管理者権限がありません。トップページへ移動します。');
-        window.location.href = '/';
+        router.push('/');
       } else {
         Promise.all([fetchLessons(), fetchPlans(), fetchUsers(), fetchAnnouncements()]).then(() => {
           setInitLoading(false);
@@ -108,7 +106,7 @@ export default function AdminPage() {
       }
     };
     checkAdmin();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (activeTab === 'users') fetchUsers();
@@ -116,9 +114,7 @@ export default function AdminPage() {
     if (activeTab === 'announcements') fetchAnnouncements();
   }, [activeTab]);
 
-  // ---------------------------------------------------------
-  // データ取得関数
-  // ---------------------------------------------------------
+  // --- データ取得関数 ---
   const fetchLessons = async () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -142,9 +138,7 @@ export default function AdminPage() {
     if (data) setAnnouncements(data);
   };
 
-  // ---------------------------------------------------------
-  // レッスン管理機能
-  // ---------------------------------------------------------
+  // --- レッスン管理機能 ---
   const handleLessonChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setLessonFormData(prev => ({ ...prev, [name]: value }));
@@ -281,9 +275,7 @@ export default function AdminPage() {
     );
   });
 
-  // ---------------------------------------------------------
-  // ユーザー管理機能
-  // ---------------------------------------------------------
+  // --- ユーザー管理機能 ---
   const openUserModal = (user?: Profile) => {
     if (user) {
       setEditingUser(user);
@@ -347,6 +339,7 @@ export default function AdminPage() {
     if(error) alert('削除失敗'); else { setMessage('🗑️ 回数券を削除しました'); fetchUsers(); }
   }
 
+  // --- プラン管理機能 ---
   const handlePlanAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPlanName.trim()) return;
@@ -360,6 +353,7 @@ export default function AdminPage() {
     if (error) alert(`削除エラー: ${error.message}`); else { setMessage('🗑️ プランを削除しました'); fetchPlans(); }
   };
 
+  // --- お知らせ管理機能 ---
   const handleAnnouncementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!announcementForm.title || !announcementForm.content) return;
@@ -435,7 +429,7 @@ export default function AdminPage() {
         {/* タブ1: 予約管理 (レッスン管理) */}
         {activeTab === 'lessons' && (
           <div className="space-y-8 animate-fadeIn">
-            {/* Googleカレンダー同期（全幅） */}
+            {/* Googleカレンダー同期 */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-blue-100">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -479,7 +473,6 @@ export default function AdminPage() {
                 </h1>
 
                 <form onSubmit={handleLessonSubmit} className="space-y-4">
-                  {/* ★追加: クラス種別選択 */}
                   <div>
                     <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">クラス種別</label>
                     <select
@@ -590,7 +583,7 @@ export default function AdminPage() {
                 </form>
               </div>
 
-              {/* 右側：レッスンリスト（コンパクト化・情報集約版） */}
+              {/* 右側：レッスンリスト */}
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200 h-full max-h-[800px] overflow-y-auto">
                 <h2 className="text-xl font-bold text-stone-700 mb-4 flex justify-between items-center">
                   今後のクラス
@@ -600,7 +593,6 @@ export default function AdminPage() {
                   {lessons.map((lesson) => {
                     const reservationCount = lesson.reservations?.length || 0;
                     
-                    // 種別ごとのスタイル設定
                     let borderClass = 'border-stone-100 hover:border-[#FCEFCF] bg-[#FDFBF7]';
                     let label = null;
 
@@ -619,12 +611,10 @@ export default function AdminPage() {
                         <div className="flex justify-between items-start mb-1">
                           <div>
                             <div className="text-[10px] font-bold text-[#EEA51A] mb-0.5 flex items-center gap-2">
-                              {/* ★修正: 終了時間を追加 */}
                               <span>{new Date(lesson.start_time).toLocaleDateString()} {new Date(lesson.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(lesson.end_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                               {label}
                             </div>
                             <h3 className="font-bold text-stone-800 text-sm mb-1">{lesson.title}</h3>
-                            {/* 詳細情報をタイトルの下に集約 */}
                             <div className="flex items-center gap-2 text-[10px] text-stone-500 flex-wrap">
                               <span>👤 {lesson.instructor_name}</span>
                               <span className="bg-stone-100 px-1.5 py-0.5 rounded text-stone-600 font-mono font-bold">
@@ -633,7 +623,6 @@ export default function AdminPage() {
                               {lesson.google_calendar_event_id && <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full text-[10px]">Google</span>}
                             </div>
                           </div>
-                          {/* 幅を固定したボタンコンテナ */}
                           <div className="flex flex-col gap-1 w-32">
                             <div className="flex gap-1 w-full">
                               <button type="button" onClick={() => handleLessonEdit(lesson)} className="flex-1 p-1 text-xs text-stone-500 hover:text-blue-600 bg-white border border-stone-200 rounded text-center transition hover:bg-stone-50">編集</button>
@@ -657,15 +646,11 @@ export default function AdminPage() {
           </div>
         )}
         
-        {/* ... (他タブやモーダルは省略せずそのまま使用) ... */}
         {/* タブ2: ユーザー管理 */}
         {activeTab === 'users' && (
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-stone-200 animate-fadeIn">
-            {/* ... ユーザー管理コンテンツ ... */}
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-stone-700 flex items-center gap-2">
-                👥 ユーザー管理
-              </h2>
+            {/* ユーザー管理 (タイトル削除済み) */}
+            <div className="flex justify-end items-center mb-6">
               <button 
                 type="button"
                 onClick={() => openUserModal()}
@@ -675,7 +660,131 @@ export default function AdminPage() {
               </button>
             </div>
             
-            <div className="overflow-x-auto">
+            {/* SP用: カード形式 */}
+            <div className="md:hidden space-y-4">
+              {users.map((u) => (
+                <div key={u.id} className="bg-[#FDFBF7] p-4 rounded-xl border border-stone-100 shadow-sm relative">
+                  <div className="mb-3">
+                     <div className="flex justify-between items-start">
+                        <span className="text-xs font-mono text-stone-400 bg-white px-2 py-0.5 rounded border border-stone-100">No.{u.member_number}</span>
+                     </div>
+                     <h3 className="font-bold text-lg text-stone-700 mt-1 flex items-center gap-2 flex-wrap">
+                        {u.full_name || 'ゲスト'}
+                        {u.line_user_id && <span className="text-[#06C755] bg-[#06C755]/10 px-1.5 py-0.5 rounded text-[10px]">LINE</span>}
+                     </h3>
+                     <div className="text-sm text-stone-500 mt-1 space-y-0.5">
+                       {u.email && !u.email.includes('@dummy.local') && <p className="truncate">✉️ {u.email}</p>}
+                       {u.phone && <p>📞 {u.phone}</p>}
+                     </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 mb-4">
+                     {u.plans ? (
+                        <span className="bg-[#FFF8E1] text-[#EEA51A] px-2 py-1 rounded text-xs font-bold border border-[#FCEFCF]">{u.plans.name}</span>
+                     ) : (
+                        <span className="bg-stone-100 text-stone-400 px-2 py-1 rounded text-xs">プラン未設定</span>
+                     )}
+                     
+                     {u.training_status === '受講済' ? (
+                        <span className="text-white bg-green-500 px-2 py-1 rounded text-xs">受講済</span>
+                      ) : u.training_status === '受講中' ? (
+                        <span className="text-white bg-blue-500 px-2 py-1 rounded text-xs">受講中</span>
+                      ) : (
+                        <span className="text-stone-400 bg-stone-100 px-2 py-1 rounded text-xs">未受講</span>
+                      )}
+
+                     {u.tags && u.tags.length > 0 && u.tags.map(tag => (
+                        <span key={tag} className="text-stone-500 bg-white px-2 py-1 rounded text-xs border border-stone-100">#{tag}</span>
+                      ))}
+                  </div>
+
+                  {/* 回数券セクション */}
+                  <div className="bg-white p-3 rounded-lg border border-stone-100 mb-3">
+                     <div className="flex justify-between items-center mb-2">
+                       <span className="text-xs font-bold text-stone-400">回数券</span>
+                       <button 
+                          type="button"
+                          onClick={() => setTicketUserId(ticketUserId === u.id ? null : u.id)}
+                          className="text-xs text-[#EEA51A] font-bold"
+                        >
+                          {ticketUserId === u.id ? '閉じる' : '+ 追加'}
+                        </button>
+                     </div>
+                     
+                     {u.user_tickets.length > 0 ? (
+                       <div className="space-y-1">
+                         {u.user_tickets.map(t => (
+                           <div key={t.id} className="flex justify-between items-center text-xs border-b border-stone-50 last:border-0 pb-1">
+                             <span className="text-stone-600">{t.ticket_name} (残{t.remaining_count})</span>
+                             <button type="button" onClick={() => handleTicketDelete(t.id)} className="text-red-300 hover:text-red-500">×</button>
+                           </div>
+                         ))}
+                       </div>
+                     ) : (
+                       <p className="text-xs text-stone-300">なし</p>
+                     )}
+
+                     {ticketUserId === u.id && (
+                        <div className="mt-2 pt-2 border-t border-stone-100 animate-fadeIn">
+                          <form onSubmit={handleTicketAdd} className="space-y-2">
+                            <input 
+                              placeholder="名称" 
+                              className="w-full p-2 text-xs border rounded bg-stone-50"
+                              required
+                              value={ticketForm.ticket_name}
+                              onChange={e => setTicketForm({...ticketForm, ticket_name: e.target.value})}
+                            />
+                            <div className="flex gap-2">
+                              <input 
+                                type="number" 
+                                placeholder="回数" 
+                                className="w-16 p-2 text-xs border rounded bg-stone-50"
+                                required
+                                value={ticketForm.remaining_count}
+                                onChange={e => setTicketForm({...ticketForm, remaining_count: Number(e.target.value)})}
+                              />
+                              <input 
+                                type="date" 
+                                className="flex-1 p-2 text-xs border rounded bg-stone-50"
+                                value={ticketForm.expires_at}
+                                onChange={e => setTicketForm({...ticketForm, expires_at: e.target.value})}
+                              />
+                            </div>
+                            <button type="submit" className="w-full bg-[#EEA51A] text-white text-xs py-2 rounded font-bold">付与する</button>
+                          </form>
+                        </div>
+                     )}
+                  </div>
+                  
+                  {u.notes && (
+                    <div className="text-xs text-stone-500 bg-stone-50 p-2 rounded mb-3">
+                      {u.notes}
+                    </div>
+                  )}
+
+                  {/* SP用アクションボタン（大きく配置・縦並び） */}
+                  <div className="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-stone-200">
+                      <button 
+                        type="button"
+                        onClick={() => openUserModal(u)} 
+                        className="py-2.5 text-sm font-bold text-blue-600 bg-white border border-blue-200 rounded-xl hover:bg-blue-50 transition shadow-sm w-full"
+                      >
+                        編集
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => handleUserDelete(u.id)} 
+                        className="py-2.5 text-sm font-bold text-red-600 bg-white border border-red-200 rounded-xl hover:bg-red-50 transition shadow-sm w-full"
+                      >
+                        削除
+                      </button>
+                   </div>
+                </div>
+              ))}
+            </div>
+
+            {/* PC用: テーブル形式 */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="text-sm text-stone-500 border-b border-stone-200">
@@ -733,7 +842,6 @@ export default function AdminPage() {
                         </div>
                       </td>
                       <td className="p-4">
-                        {/* 回数券一覧 */}
                         <div className="space-y-2 mb-3">
                           {u.user_tickets.map(t => (
                             <div key={t.id} className="flex justify-between items-center text-sm bg-white border border-stone-100 p-2 rounded-lg">
@@ -748,7 +856,6 @@ export default function AdminPage() {
                           {u.user_tickets.length === 0 && <span className="text-sm text-stone-300">なし</span>}
                         </div>
                         
-                        {/* 回数券追加ボタン（トグル） */}
                         {ticketUserId === u.id ? (
                           <div className="bg-stone-50 p-3 rounded-xl border border-stone-200">
                             <p className="text-sm font-bold text-stone-500 mb-2">回数券を付与</p>
@@ -796,146 +903,16 @@ export default function AdminPage() {
                         {u.notes || '-'}
                       </td>
                       <td className="p-4 text-right">
-                        <button type="button" onClick={() => openUserModal(u)} className="p-2 text-stone-400 hover:text-blue-600">✏️</button>
-                        <button type="button" onClick={() => handleUserDelete(u.id)} className="p-2 text-stone-400 hover:text-red-600">🗑️</button>
+                        {/* PC用操作ボタン（縦並び） */}
+                        <div className="flex flex-col gap-1 justify-center items-end">
+                            <button type="button" onClick={() => openUserModal(u)} className="w-16 py-1 text-xs font-bold text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 transition">編集</button>
+                            <button type="button" onClick={() => handleUserDelete(u.id)} className="w-16 py-1 text-xs font-bold text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 transition">削除</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
-        )}
-
-        {/* ユーザー登録・編集モーダル */}
-        {userModalOpen && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl overflow-y-auto max-h-[90vh]">
-              <h3 className="text-xl font-bold text-stone-700 mb-6">
-                {editingUser ? 'ユーザー編集' : '新規ユーザー登録'}
-              </h3>
-              
-              {createdPassword ? (
-                <div className="text-center space-y-4">
-                  <div className="bg-green-50 p-4 rounded-xl text-green-800">
-                    <p className="font-bold">✅ ユーザーを作成しました</p>
-                    <p className="text-sm mt-2">以下の仮パスワードをユーザーに伝えてください。</p>
-                    <div className="mt-2 text-xl font-mono bg-white p-2 rounded border border-green-200 select-all">
-                      {createdPassword}
-                    </div>
-                  </div>
-                  <button 
-                    type="button"
-                    onClick={() => { setUserModalOpen(false); setCreatedPassword(''); }}
-                    className="w-full bg-stone-800 text-white font-bold py-3 rounded-xl"
-                  >
-                    閉じる
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleUserSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">お名前 <span className="text-red-500">*</span></label>
-                    <input
-                      required
-                      value={userFormData.full_name}
-                      onChange={(e) => setUserFormData({...userFormData, full_name: e.target.value})}
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                    />
-                  </div>
-                  
-                  {/* Emailは任意化 */}
-                  <div>
-                    <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">Email</label>
-                    <input
-                      type="email"
-                      value={userFormData.email && !userFormData.email.includes('@dummy.local') ? userFormData.email : ''}
-                      onChange={(e) => setUserFormData({...userFormData, email: e.target.value})}
-                      placeholder="未入力の場合は自動生成されます"
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                    />
-                  </div>
-
-                  {/* 電話番号 */}
-                  <div>
-                    <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">電話番号</label>
-                    <input
-                      type="tel"
-                      value={userFormData.phone}
-                      onChange={(e) => setUserFormData({...userFormData, phone: e.target.value})}
-                      placeholder="090-1234-5678"
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">プラン</label>
-                      <select
-                        value={userFormData.plan_id}
-                        onChange={(e) => setUserFormData({...userFormData, plan_id: e.target.value})}
-                        className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                      >
-                        <option value="">プランなし</option>
-                        {plans.map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">養成講座ステータス</label>
-                      <select
-                        value={userFormData.training_status}
-                        onChange={(e) => setUserFormData({...userFormData, training_status: e.target.value})}
-                        className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                      >
-                        <option value="未受講">未受講</option>
-                        <option value="受講中">受講中</option>
-                        <option value="受講済">受講済</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* ユーザータグ入力欄 */}
-                  <div>
-                    <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">ユーザータグ (カンマ区切り)</label>
-                    <input
-                      value={userFormData.tags}
-                      onChange={(e) => setUserFormData({...userFormData, tags: e.target.value})}
-                      placeholder="例: 体験, キャンペーン, 会員"
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">備考</label>
-                    <textarea
-                      rows={3}
-                      value={userFormData.notes}
-                      onChange={(e) => setUserFormData({...userFormData, notes: e.target.value})}
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                      placeholder="メモを入力..."
-                    />
-                  </div>
-                  
-                  <div className="flex gap-3 mt-6">
-                    <button
-                      type="button"
-                      onClick={() => setUserModalOpen(false)}
-                      className="flex-1 bg-stone-100 text-stone-500 font-bold py-3 rounded-xl hover:bg-stone-200"
-                    >
-                      キャンセル
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="flex-1 bg-[#EEA51A] text-white font-bold py-3 rounded-xl hover:bg-[#D99000] disabled:opacity-50"
-                    >
-                      {loading ? '処理中...' : editingUser ? '更新する' : '登録する'}
-                    </button>
-                  </div>
-                </form>
-              )}
             </div>
           </div>
         )}
@@ -1091,8 +1068,9 @@ export default function AdminPage() {
         {/* ... (モーダル部分は省略せずそのまま使用) ... */}
         {reservationModalOpen && selectedLesson && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl overflow-y-auto max-h-[90vh]">
-              <div className="flex justify-between items-start mb-6">
+             {/* ... (変更なし) ... */}
+             <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl overflow-y-auto max-h-[90vh]">
+               <div className="flex justify-between items-start mb-6">
                 <div>
                   <h3 className="text-xl font-bold text-stone-700">{selectedLesson.title}</h3>
                   <p className="text-sm text-stone-500">
@@ -1105,7 +1083,6 @@ export default function AdminPage() {
               {/* 予約者一覧 */}
               <div className="mb-8">
                 <h4 className="font-bold text-stone-600 mb-3 border-b pb-2">
-                  {/* 型アサーションを使ってreservationsにアクセス */}
                   予約済みメンバー ({(selectedLesson as any).reservations?.length || 0}名)
                 </h4>
                 {(selectedLesson as any).reservations && (selectedLesson as any).reservations.length > 0 ? (
@@ -1160,6 +1137,139 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* ユーザー登録・編集モーダル */}
+        {userModalOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl overflow-y-auto max-h-[90vh]">
+              <h3 className="text-xl font-bold text-stone-700 mb-6">
+                {editingUser ? 'ユーザー編集' : '新規ユーザー登録'}
+              </h3>
+              
+              {createdPassword ? (
+                <div className="text-center space-y-4">
+                  <div className="bg-green-50 p-4 rounded-xl text-green-800">
+                    <p className="font-bold">✅ ユーザーを作成しました</p>
+                    <p className="text-sm mt-2">以下の仮パスワードをユーザーに伝えてください。</p>
+                    <div className="mt-2 text-xl font-mono bg-white p-2 rounded border border-green-200 select-all">
+                      {createdPassword}
+                    </div>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => { setUserModalOpen(false); setCreatedPassword(''); }}
+                    className="w-full bg-stone-800 text-white font-bold py-3 rounded-xl"
+                  >
+                    閉じる
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleUserSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">お名前 <span className="text-red-500">*</span></label>
+                    <input
+                      required
+                      value={userFormData.full_name}
+                      onChange={(e) => setUserFormData({...userFormData, full_name: e.target.value})}
+                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
+                    />
+                  </div>
+                  
+                  {/* Emailは任意化 */}
+                  <div>
+                    <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">Email</label>
+                    <input
+                      type="email"
+                      value={userFormData.email && !userFormData.email.includes('@dummy.local') ? userFormData.email : ''}
+                      onChange={(e) => setUserFormData({...userFormData, email: e.target.value})}
+                      placeholder="未入力の場合は自動生成されます"
+                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
+                    />
+                  </div>
+
+                  {/* 電話番号 */}
+                  <div>
+                    <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">電話番号</label>
+                    <input
+                      type="tel"
+                      value={userFormData.phone}
+                      onChange={(e) => setUserFormData({...userFormData, phone: e.target.value})}
+                      placeholder="090-1234-5678"
+                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">プラン</label>
+                      <select
+                        value={userFormData.plan_id}
+                        onChange={(e) => setUserFormData({...userFormData, plan_id: e.target.value})}
+                        className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
+                      >
+                        <option value="">プランなし</option>
+                        {plans.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">養成講座ステータス</label>
+                      <select
+                        value={userFormData.training_status}
+                        onChange={(e) => setUserFormData({...userFormData, training_status: e.target.value})}
+                        className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
+                      >
+                        <option value="未受講">未受講</option>
+                        <option value="受講中">受講中</option>
+                        <option value="受講済">受講済</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* ユーザータグ入力欄 */}
+                  <div>
+                    <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">ユーザータグ (カンマ区切り)</label>
+                    <input
+                      value={userFormData.tags}
+                      onChange={(e) => setUserFormData({...userFormData, tags: e.target.value})}
+                      placeholder="例: 体験, キャンペーン, 会員"
+                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">備考</label>
+                    <textarea
+                      rows={3}
+                      value={userFormData.notes}
+                      onChange={(e) => setUserFormData({...userFormData, notes: e.target.value})}
+                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
+                      placeholder="メモを入力..."
+                    />
+                  </div>
+                  
+                  <div className="flex gap-3 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => setUserModalOpen(false)}
+                      className="flex-1 bg-stone-100 text-stone-500 font-bold py-3 rounded-xl hover:bg-stone-200"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="flex-1 bg-[#EEA51A] text-white font-bold py-3 rounded-xl hover:bg-[#D99000] disabled:opacity-50"
+                    >
+                      {loading ? '処理中...' : editingUser ? '更新する' : '登録する'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+
         {message && (
           <div className={`fixed bottom-4 right-4 p-4 rounded-xl shadow-xl font-bold animate-bounce z-50 ${message.includes('エラー') ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-[#FFF8E1] text-[#EEA51A] border border-[#FCEFCF]'}`}>
             {message}
@@ -1167,5 +1277,20 @@ export default function AdminPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// デフォルトエクスポートするコンポーネント (Suspenseでラップ)
+export default function AdminPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#F7F5F0] flex flex-col items-center justify-center">
+        <div className="w-32 animate-pulse">
+          <img src="/logo.png" alt="Loading..." className="w-full h-auto object-contain" />
+        </div>
+      </div>
+    }>
+      <AdminContent />
+    </Suspense>
   );
 }

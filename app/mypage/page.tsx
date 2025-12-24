@@ -192,7 +192,7 @@ export default function MyPage() {
           </button>
         </div>
 
-        {/* お知らせセクション (会員証の上に移動) */}
+        {/* お知らせセクション */}
         {announcements.length > 0 && (
           <section>
             <div className="space-y-2">
@@ -221,6 +221,15 @@ export default function MyPage() {
         <div className="bg-[#EEA51A] rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-yellow-300 opacity-20 rounded-full -ml-10 -mb-10 blur-3xl"></div>
+
+          {/* ★修正: RYT200リボン (より目立つデザイン) */}
+          {profile?.training_status === '受講済' && (
+            <div className="absolute top-0 right-0 w-28 h-28 overflow-hidden z-20 rounded-tr-3xl pointer-events-none">
+              <div className="absolute top-[20px] -right-[30px] w-[140px] bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-300 text-amber-900 shadow-lg text-center py-1.5 rotate-45 font-bold text-xs tracking-widest border border-white/40">
+                RYT200
+              </div>
+            </div>
+          )}
 
           <div className="relative z-10">
             {/* 上段：QRコードと利用状況 */}
@@ -325,7 +334,6 @@ export default function MyPage() {
 
           {reservations.length > 0 ? (
             <div className="space-y-6">
-              {/* 日付ごとにグルーピングして表示 */}
               {Array.from(new Set(reservations.map(res => format(parseISO(res.lessons.start_time), 'yyyy-MM-dd')))).map(dateKey => {
                 const dayReservations = reservations.filter(res => format(parseISO(res.lessons.start_time), 'yyyy-MM-dd') === dateKey);
                 const dateObj = parseISO(dayReservations[0].lessons.start_time);
@@ -390,7 +398,7 @@ export default function MyPage() {
           )}
         </section>
 
-        {/* お知らせ詳細モーダル */}
+        {/* お知らせモーダル */}
         {selectedAnnouncement && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setSelectedAnnouncement(null)}>
             <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>

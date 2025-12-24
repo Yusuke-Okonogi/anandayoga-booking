@@ -128,10 +128,8 @@ export default function Home() {
     }
 
     if (user) {
-      // ログイン済みなら会員予約へ
       handleMemberReserve(lesson.id, lesson.title, lesson.start_time, lesson.instructor_name);
     } else {
-      // 未ログインならビジター選択モーダルへ
       setTargetLesson(lesson);
       setVisitorMode(false);
       setVisitorForm({ fullName: '', email: '', phone: '' });
@@ -320,16 +318,20 @@ export default function Home() {
   };
 
   const getAvailability = (lesson: Lesson) => {
+    const count = lesson.reservations ? lesson.reservations.length : 0;
+    const capacity = lesson.capacity || 15;
+    const ratio = count / capacity;
+
     if (lesson.type === 'personal') {
+      // ★修正: パーソナルも満員チェック
+      if (count >= capacity) {
+        return { icon: '✕', text: '受付終了', color: 'text-stone-400', bg: 'bg-stone-100', border: 'border-stone-200', isFull: true };
+      }
       return { icon: '◇', text: '日程調整', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200', isFull: false };
     }
     if (lesson.type === 'training') {
       return { icon: '-', text: '予約不可', color: 'text-slate-600', bg: 'bg-slate-100', border: 'border-slate-300', isFull: true };
     }
-
-    const count = lesson.reservations ? lesson.reservations.length : 0;
-    const capacity = lesson.capacity || 15;
-    const ratio = count / capacity;
 
     if (count >= capacity) {
       return { icon: '✕', text: '満員', color: 'text-stone-400', bg: 'bg-stone-100', border: 'border-stone-200', isFull: true };
@@ -380,7 +382,7 @@ export default function Home() {
             className={`
               min-h-[100px] p-1 cursor-pointer transition relative flex flex-col border-r border-b border-stone-200
               ${isToday 
-                ? 'bg-[#FFF8E1]' 
+                ? 'bg-[#FFF8E1] z-10 shadow-sm' 
                 : `hover:bg-[#FFF8E1] ${!isSameDay(day, new Date()) && !isSameMonth(day, monthStart) ? 'bg-stone-50/50 text-stone-300' : 'bg-white'}`
               }
             `}
@@ -456,7 +458,7 @@ export default function Home() {
         {/* コンテンツエリア */}
         <div className="px-4 sm:px-0">
           
-          {/* 予約に関する注意書き（簡略化版） */}
+          {/* 予約に関する注意書き */}
           <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-200 mb-6 text-center text-xs text-stone-500 leading-relaxed">
             <span className="text-[#EEA51A] mr-1">ℹ️</span>
             予約・キャンセルは<span className="font-bold text-stone-600">開始1時間前</span>まで
@@ -616,7 +618,6 @@ export default function Home() {
                                   
                                   <div className="w-full sm:w-auto mt-2 sm:mt-0 flex flex-col items-stretch sm:items-end gap-2">
                                     {isReserved ? (
-                                        // 予約済み -> キャンセルボタン
                                         <button 
                                           onClick={() => handleCancel(userReservation!.id, lesson.title, lesson.start_time, lesson.instructor_name)}
                                           className="w-full sm:w-32 bg-white text-red-500 border border-red-200 text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 hover:bg-red-50 hover:border-red-400 shadow-sm"
@@ -624,33 +625,36 @@ export default function Home() {
                                           キャンセル
                                         </button>
                                     ) : lesson.type === 'personal' ? (
-                                        // パーソナル -> リクエストボタン
+                                        // ★修正: 満員時はボタンを無効化して表示を変更
                                         <button 
                                           onClick={() => openPersonalRequest(lesson)}
-                                          className="w-full sm:w-32 bg-indigo-600 text-white text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 hover:bg-indigo-700 shadow-md"
+                                          disabled={status.isFull}
+                                          className={`w-full sm:w-32 text-white text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 shadow-md ${
+                                            status.isFull
+                                              ? 'bg-stone-400 cursor-not-allowed'
+                                              : 'bg-indigo-600 hover:bg-indigo-700'
+                                          }`}
                                         >
-                                          予約リクエスト
+                                          {status.isFull ? '受付終了' : '予約リクエスト'}
                                         </button>
                                     ) : lesson.type === 'training' ? (
-                                        // 養成講座 -> ボタンなし (表示のみ)
                                         <span className="text-xs text-slate-500 font-bold px-4 py-2 bg-slate-100 rounded-full border border-slate-200 text-center">
                                            ※予約不可
                                         </span>
                                     ) : (
                                         // ★修正: 未ログインでもボタンを表示（handleReserveClickで分岐）
-                                        // disabled条件から `!user` を削除
                                         <button 
                                           onClick={() => handleReserveClick(lesson)}
-                                          disabled={reservingId === lesson.id || (user && (status.isFull || !isReservableTime))}
+                                          disabled={reservingId === lesson.id || (user && status.isFull) || !isReservableTime}
                                           className={`w-full sm:w-32 text-white text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${
-                                            user && !isReservableTime
+                                            !isReservableTime
                                               ? 'bg-stone-300' 
-                                              : user && status.isFull 
+                                              : status.isFull 
                                                 ? 'bg-stone-400' 
                                                 : 'bg-stone-800 hover:bg-[#EEA51A]'
                                           }`}
                                         >
-                                          {reservingId === lesson.id ? '予約中...' : (user && !isReservableTime) ? '受付終了' : (user && status.isFull) ? '満員' : '予約する'}
+                                          {reservingId === lesson.id ? '予約中...' : !isReservableTime ? '受付終了' : status.isFull ? '満員' : '予約する'}
                                         </button>
                                     )}
                                   </div>

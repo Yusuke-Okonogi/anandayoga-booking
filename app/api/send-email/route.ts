@@ -3,7 +3,6 @@ import nodemailer from 'nodemailer';
 
 export async function POST(request: Request) {
   try {
-    // contactSubject, contactBody を追加
     const { type, userEmail, userName, lessonTitle, lessonDate, instructorName, contactSubject, contactBody } = await request.json();
 
     // 1. トランスポーター設定
@@ -59,7 +58,7 @@ export async function POST(request: Request) {
       `;
 
     } else if (type === 'contact') {
-      // --- ★追加: お問い合わせ時 ---
+      // --- お問い合わせ時 ---
       subject = '【Ananda Yoga】お問い合わせを受け付けました';
       userHtml = `
         <div style="${commonStyle}">
@@ -75,9 +74,10 @@ export async function POST(request: Request) {
       `;
 
       adminSubject = `【問い合わせ】${userName}様より: ${contactSubject}`;
+      // ★修正: 見出しを「マイページからのお問い合わせ」から「お問い合わせ」に変更
       adminHtml = `
         <div style="${commonStyle}">
-          <h2>マイページからのお問い合わせ</h2>
+          <h2>お問い合わせ</h2>
           <p><strong>会員名:</strong> ${userName} (<a href="mailto:${userEmail}">${userEmail}</a>)</p>
           <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <p style="margin: 5px 0; font-weight: bold;">${contactSubject}</p>
