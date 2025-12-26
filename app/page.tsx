@@ -29,7 +29,7 @@ export default function Home() {
   const router = useRouter();
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [user, setUser] = useState<any>(null);
-  const [userRole, setUserRole] = useState<string | null>(null); // 管理者判定用
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [lessonsLoading, setLessonsLoading] = useState(false);
   const [reservingId, setReservingId] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export default function Home() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [targetLesson, setTargetLesson] = useState<Lesson | null>(null);
   const [visitorMode, setVisitorMode] = useState(false);
-  const [visitorForm, setVisitorForm] = useState({ fullName: '', email: '', phone: '' });
+  const [visitorForm, setVisitorForm] = useState({ fullName: '', email: '', phone: '', notes: '' });
 
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [contactForm, setContactForm] = useState({ subject: '', body: '' });
@@ -59,7 +59,6 @@ export default function Home() {
       setUser(user);
 
       if (user) {
-        // roleを取得して管理者かどうか判定
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
@@ -122,17 +121,21 @@ export default function Home() {
   const handleReserveClick = (lesson: Lesson) => {
     const lessonStart = new Date(lesson.start_time);
     const reservationDeadline = new Date(lessonStart.getTime() - 60 * 60 * 1000);
-    if (now > reservationDeadline) {
+    if (lesson.type !== 'personal' && now > reservationDeadline) {
       alert('予約受付時間を過ぎています（開始1時間前まで）');
       return;
     }
 
     if (user) {
-      handleMemberReserve(lesson.id, lesson.title, lesson.start_time, lesson.instructor_name);
+      if (lesson.type === 'personal') {
+        openPersonalRequest(lesson);
+      } else {
+        handleMemberReserve(lesson.id, lesson.title, lesson.start_time, lesson.instructor_name);
+      }
     } else {
       setTargetLesson(lesson);
       setVisitorMode(false);
-      setVisitorForm({ fullName: '', email: '', phone: '' });
+      setVisitorForm({ fullName: '', email: '', phone: '', notes: '' });
       setShowLoginModal(true);
     }
   };
@@ -227,11 +230,10 @@ export default function Home() {
   };
 
   const openPersonalRequest = (lesson: Lesson) => {
-    // 未ログインの場合はログインへ誘導
     if (!user) {
       setTargetLesson(lesson);
       setVisitorMode(false);
-      setVisitorForm({ fullName: '', email: '', phone: '' });
+      setVisitorForm({ fullName: '', email: '', phone: '', notes: '' });
       setShowLoginModal(true);
       return;
     }
@@ -286,29 +288,66 @@ export default function Home() {
   const handleVisitorReserve = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetLesson || !visitorForm.fullName || !visitorForm.email) return;
-    if (!confirm(`「${targetLesson.title}」を予約しますか？`)) return;
+
+    if (targetLesson.type === 'personal' && !visitorForm.notes) {
+      alert('希望日時をご記入ください');
+      return;
+    }
+
+    if (!confirm(`「${targetLesson.title}」${targetLesson.type === 'personal' ? 'のリクエストを送信' : 'を予約'}しますか？`)) return;
 
     setReservingId(targetLesson.id);
 
     try {
-      const formattedDate = format(parseISO(targetLesson.start_time), 'yyyy年M月d日(E) HH:mm', { locale: ja });
-      const res = await fetch('/api/visitor-reserve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: visitorForm.fullName,
-          email: visitorForm.email,
-          phone: visitorForm.phone,
-          lessonId: targetLesson.id,
-          lessonTitle: targetLesson.title,
-          lessonDate: formattedDate,
-          instructorName: targetLesson.instructor_name
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '予約に失敗しました');
+      if (targetLesson.type === 'personal') {
+        const res = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'contact',
+            userEmail: visitorForm.email,
+            userName: `${visitorForm.fullName} (ビジター)`,
+            contactSubject: `【ビジター予約リクエスト】${targetLesson.title}`,
+            contactBody: `
+■予約希望クラス
+${targetLesson.title}
 
-      alert('🎉 予約が完了しました！\n確認メールをお送りしました。\n\n当日は受付にて簡単な会員登録をお願いいたします。');
+■ビジター情報
+お名前: ${visitorForm.fullName}
+Email: ${visitorForm.email}
+電話: ${visitorForm.phone}
+
+■希望日時・備考
+${visitorForm.notes}
+            `
+          }),
+        });
+
+        if (!res.ok) throw new Error('送信失敗');
+        alert('リクエストを送信しました。\n担当者からの連絡をお待ちください。');
+
+      } else {
+        const formattedDate = format(parseISO(targetLesson.start_time), 'yyyy年M月d日(E) HH:mm', { locale: ja });
+        const res = await fetch('/api/visitor-reserve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: visitorForm.fullName,
+            email: visitorForm.email,
+            phone: visitorForm.phone,
+            lessonId: targetLesson.id,
+            lessonTitle: targetLesson.title,
+            lessonDate: formattedDate,
+            instructorName: targetLesson.instructor_name
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '予約に失敗しました');
+
+        alert('🎉 予約が完了しました！\n確認メールをお送りしました。\n\n当日は受付にて簡単な会員登録をお願いいたします。');
+      }
+      
       setShowLoginModal(false);
       fetchLessons();
     } catch (err: any) {
@@ -318,20 +357,16 @@ export default function Home() {
   };
 
   const getAvailability = (lesson: Lesson) => {
-    const count = lesson.reservations ? lesson.reservations.length : 0;
-    const capacity = lesson.capacity || 15;
-    const ratio = count / capacity;
-
     if (lesson.type === 'personal') {
-      // ★修正: パーソナルも満員チェック
-      if (count >= capacity) {
-        return { icon: '✕', text: '受付終了', color: 'text-stone-400', bg: 'bg-stone-100', border: 'border-stone-200', isFull: true };
-      }
       return { icon: '◇', text: '日程調整', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200', isFull: false };
     }
     if (lesson.type === 'training') {
       return { icon: '-', text: '予約不可', color: 'text-slate-600', bg: 'bg-slate-100', border: 'border-slate-300', isFull: true };
     }
+
+    const count = lesson.reservations ? lesson.reservations.length : 0;
+    const capacity = lesson.capacity || 15;
+    const ratio = count / capacity;
 
     if (count >= capacity) {
       return { icon: '✕', text: '満員', color: 'text-stone-400', bg: 'bg-stone-100', border: 'border-stone-200', isFull: true };
@@ -458,7 +493,7 @@ export default function Home() {
         {/* コンテンツエリア */}
         <div className="px-4 sm:px-0">
           
-          {/* 予約に関する注意書き */}
+          {/* 予約に関する注意書き（簡略化版） */}
           <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-200 mb-6 text-center text-xs text-stone-500 leading-relaxed">
             <span className="text-[#EEA51A] mr-1">ℹ️</span>
             予約・キャンセルは<span className="font-bold text-stone-600">開始1時間前</span>まで
@@ -618,6 +653,7 @@ export default function Home() {
                                   
                                   <div className="w-full sm:w-auto mt-2 sm:mt-0 flex flex-col items-stretch sm:items-end gap-2">
                                     {isReserved ? (
+                                        // 予約済み -> キャンセルボタン
                                         <button 
                                           onClick={() => handleCancel(userReservation!.id, lesson.title, lesson.start_time, lesson.instructor_name)}
                                           className="w-full sm:w-32 bg-white text-red-500 border border-red-200 text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 hover:bg-red-50 hover:border-red-400 shadow-sm"
@@ -625,27 +661,29 @@ export default function Home() {
                                           キャンセル
                                         </button>
                                     ) : lesson.type === 'personal' ? (
-                                        // ★修正: 満員時はボタンを無効化して表示を変更
+                                        // パーソナル -> リクエストボタン (満員時は受付終了)
                                         <button 
                                           onClick={() => openPersonalRequest(lesson)}
                                           disabled={status.isFull}
                                           className={`w-full sm:w-32 text-white text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 shadow-md ${
-                                            status.isFull
-                                              ? 'bg-stone-400 cursor-not-allowed'
+                                            status.isFull 
+                                              ? 'bg-stone-400 cursor-not-allowed' 
                                               : 'bg-indigo-600 hover:bg-indigo-700'
                                           }`}
                                         >
                                           {status.isFull ? '受付終了' : '予約リクエスト'}
                                         </button>
                                     ) : lesson.type === 'training' ? (
+                                        // 養成講座 -> ボタンなし (表示のみ)
                                         <span className="text-xs text-slate-500 font-bold px-4 py-2 bg-slate-100 rounded-full border border-slate-200 text-center">
                                            ※予約不可
                                         </span>
                                     ) : (
-                                        // ★修正: 未ログインでもボタンを表示（handleReserveClickで分岐）
+                                        // 通常 -> 予約ボタン (未ログインでも押せる)
+                                        // ★修正: 満員 or 時間外の場合はボタン無効化
                                         <button 
                                           onClick={() => handleReserveClick(lesson)}
-                                          disabled={reservingId === lesson.id || (user && status.isFull) || !isReservableTime}
+                                          disabled={reservingId === lesson.id || status.isFull || !isReservableTime}
                                           className={`w-full sm:w-32 text-white text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${
                                             !isReservableTime
                                               ? 'bg-stone-300' 
@@ -672,11 +710,9 @@ export default function Home() {
           )}
         </div>
 
-        {/* ... (モーダル群はそのまま) ... */}
         {/* ビジター予約モーダル */}
         {showLoginModal && targetLesson && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setShowLoginModal(false)}>
-             {/* ... モーダルの中身 ... */}
              <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
               <h3 className="text-xl font-bold text-stone-700 mb-2">予約方法の選択</h3>
               <p className="text-sm text-stone-500 mb-6">
@@ -737,6 +773,20 @@ export default function Home() {
                     />
                   </div>
                   
+                  {/* パーソナルの場合のみ希望日時を表示 */}
+                  {targetLesson.type === 'personal' && (
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">希望日時 (必須)</label>
+                        <textarea
+                          required
+                          placeholder="第一希望: 〇月〇日 10:00〜&#13;&#10;第二希望: 〇月〇日 14:00〜"
+                          className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none h-24"
+                          value={visitorForm.notes || ''}
+                          onChange={(e) => setVisitorForm({...visitorForm, notes: e.target.value})}
+                        />
+                    </div>
+                  )}
+                  
                   <div className="pt-2 flex gap-3">
                     <button
                       type="button"
@@ -750,7 +800,7 @@ export default function Home() {
                       disabled={reservingId === targetLesson.id}
                       className="flex-1 bg-[#EEA51A] text-white font-bold py-3 rounded-xl hover:bg-[#D99000] disabled:opacity-50 shadow-md"
                     >
-                      {reservingId === targetLesson.id ? '送信中...' : '予約する'}
+                      {reservingId === targetLesson.id ? '送信中...' : targetLesson.type === 'personal' ? 'リクエスト' : '予約する'}
                     </button>
                   </div>
                 </form>

@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       userHtml = `
         <div style="${commonStyle}">
           <h2>${userName} 様</h2>
-          <p>お問い合わせありがとうございます。<br>以下の内容で受け付けました。担当者より折り返しご連絡いたします。</p>
+          <p>お問い合わせありがとうございます。<br>以下の内容で受け付けました。パーソナルクラスはご希望日時で実施可能かどうか確認後、担当者よりご連絡いたします。</p>
           <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin: 20px 0; background-color: #f9f9f9;">
             <p style="margin: 5px 0; font-weight: bold;">[件名] ${contactSubject}</p>
             <p style="margin: 5px 0; white-space: pre-wrap;">${contactBody}</p>
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
             <p style="margin: 5px 0;"><strong>日時:</strong> ${lessonDate}</p>
             <p style="margin: 5px 0;"><strong>担当:</strong> ${instructorName}</p>
           </div>
-          <p>当日はお気をつけてお越しくださいませ。<br>キャンセルはマイページより行えます。</p>
+          <p>当日はお気をつけてお越しくださいませ。開始時刻の10分前からご入室いただけます。<br>キャンセルはマイページより行えます。</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
           <p style="font-size: 12px; color: #666;">Ananda Yoga Studio<br>Web: https://ananda-yogaschool.com</p>
         </div>
