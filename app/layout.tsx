@@ -1,26 +1,19 @@
-import './globals.css'
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import Header from './components/Header' // ★修正: 相対パス(./)に変更
+import './globals.css'; // 必要に応じてcssをインポート
+import MainLayout from './components/MainLayout';
 
-const inter = Inter({ subsets: ['latin'] })
-
-export const metadata: Metadata = {
+export const metadata = {
   title: 'Ananda Yoga',
-  description: '',
-}
+  description: '前橋のヨガスタジオ',
+};
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
-      <body className={inter.className}>
-        <Header />
-        {children}
+      <body>
+        <MainLayout>
+            {children}
+        </MainLayout>
       </body>
     </html>
-  )
+  );
 }

@@ -10,7 +10,6 @@ export default function Header() {
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
   
   // ハンバーガーメニューの開閉状態
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -23,6 +22,15 @@ export default function Header() {
   // ログインページではヘッダーを表示しない
   const isLoginPage = pathname === '/login';
 
+  // システムページ判定
+  const isSystemPage = pathname?.startsWith('/booking') || pathname?.startsWith('/admin');
+
+  // コンテナのクラス切り替え
+  const containerClass = !isSystemPage
+    ? 'w-full max-w-[480px] mx-auto bg-white/95 backdrop-blur-md shadow-sm' 
+    : 'w-full bg-[#F7F5F0]/95 backdrop-blur-md shadow-sm';
+
+  // ユーザーチェック処理
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -39,7 +47,6 @@ export default function Header() {
           setIsAdmin(true);
         }
       }
-      setLoading(false);
     };
 
     checkUser();
@@ -53,19 +60,27 @@ export default function Header() {
     };
   }, [pathname]);
 
+  // メニュー開閉時のスクロール制御
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [isMenuOpen]);
+
   // ページ遷移時にメニューを閉じる
   useEffect(() => {
     setIsMenuOpen(false);
   }, [pathname]);
 
-  // メニューを閉じる関数
   const closeMenu = () => setIsMenuOpen(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
     setIsAdmin(false);
-    setIsMenuOpen(false);
+    closeMenu();
     router.push('/login');
     router.refresh();
   };
@@ -75,7 +90,6 @@ export default function Header() {
     e.preventDefault();
     if (!contactForm.subject || !contactForm.body) return;
     
-    // 未ログイン時は名前とメールアドレスも必須チェック
     if (!user && (!contactForm.name || !contactForm.email)) {
       alert('お名前とメールアドレスを入力してください');
       return;
@@ -84,7 +98,6 @@ export default function Header() {
     setSendingContact(true);
 
     try {
-      // 送信前にユーザー詳細情報を取得
       let userName = contactForm.name || 'ゲスト';
       let userEmail = contactForm.email || user?.email;
 
@@ -116,16 +129,13 @@ export default function Header() {
       const data = await res.json();
 
       if (!res.ok) {
-        const errorMessage = data.details 
-          ? `${data.error}: ${data.details}` 
-          : (data.error || '送信サーバーエラー');
-        throw new Error(errorMessage);
+        throw new Error(data.error || '送信サーバーエラー');
       }
 
       alert('お問い合わせを送信しました。\n確認メールをご確認ください。');
       setContactModalOpen(false);
       setContactForm({ name: '', email: '', subject: '', body: '' });
-      setIsMenuOpen(false);
+      closeMenu();
 
     } catch (err: any) {
       console.error('Contact send error:', err);
@@ -138,239 +148,201 @@ export default function Header() {
 
   return (
     <>
-      {/* ヘッダー全体をラップして固定(sticky)にするコンテナ */}
-      <div className="sticky top-0 z-40 w-full shadow-sm transition-all">
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         
-        {/* 管理者モード表示バー */}
+        /* 波紋アニメーション */
+        @keyframes pulse-ripple {
+          0% {
+            box-shadow: 0 0 0 0 rgba(238, 165, 26, 0.7);
+          }
+          70% {
+            box-shadow: 0 0 0 15px rgba(238, 165, 26, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(238, 165, 26, 0);
+          }
+        }
+
+        /* 追従メニューボタンのアニメーション */
+        .menu-fab {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .menu-fab:not(.open) {
+          animation: pulse-ripple 2s infinite;
+        }
+        .menu-fab:active {
+          transform: translateX(-50%) scale(0.95);
+        }
+        .menu-fab.open {
+           background-color: #333;
+           border-color: #333;
+           box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+           border-width: 0px; 
+        }
+      `}</style>
+
+      {/* ヘッダー本体 */}
+      <div className={`sticky top-0 z-[2000] ${containerClass}`}>
         {isAdmin && (
-          <div className="bg-stone-800 text-white text-xs py-1 px-4 text-center font-bold tracking-wider relative z-50">
-            🔧 管理者モードでログイン中
+          <div className="bg-stone-800 text-white text-[10px] py-1 px-4 text-center font-bold tracking-wider relative z-50">
+            🔧 管理者モード
           </div>
         )}
 
-        {/* メインヘッダー */}
-        <header className="bg-[#F7F5F0]/95 backdrop-blur-md h-16 w-full relative">
-          <div className="max-w-6xl mx-auto px-4 sm:px-8 h-full flex justify-between items-center relative">
+        <header className="h-14 w-full relative flex items-center border-b border-stone-100">
+          <div className={`w-full h-full px-4 flex justify-between items-center ${isSystemPage ? 'max-w-6xl mx-auto px-4' : ''}`}>
             
             {/* ロゴエリア */}
-            <Link href="/" onClick={closeMenu} className="flex items-center gap-3 hover:opacity-80 transition z-50">
-              <div className="h-8 sm:h-10 w-auto">
-                <img src="/logo.png" alt="Anandayoga" className="h-full w-auto object-contain" />
+            <div className="flex items-center gap-2 h-full overflow-hidden">
+              <Link href="/" onClick={closeMenu} className="flex items-center h-full hover:opacity-80 transition shrink-0">
+                <img src="/img/logo.png" alt="Ananda Yoga" className="h-6 w-auto object-contain" />
+              </Link>
+              <div className="flex items-center gap-1 shrink-0">
+                 <img src="/img/rys200.png" alt="RYS200" className="h-7 w-auto object-contain" />
+                 <img src="/img/yoga_alliance.png" alt="Yoga Alliance" className="h-7 w-auto object-contain" />
               </div>
-              {pathname.startsWith('/admin') && (
-                <span className="text-xs font-bold text-stone-500 border-l border-stone-300 pl-3 ml-1 hidden sm:block">
-                  管理者画面
-                </span>
-              )}
-            </Link>
-
-            {/* ナビゲーション */}
-            <div className="flex items-center gap-1 sm:gap-4 z-50">
-              {!loading && (
-                <>
-                  {user ? (
-                    <>
-                      {/* マイページリンク (SP: アイコンのみ) */}
-                      <Link 
-                        href="/mypage" 
-                        className={`md:hidden p-2 rounded-lg transition ${
-                          pathname === '/mypage' ? 'text-[#EEA51A]' : 'text-stone-600 hover:bg-stone-100'
-                        }`}
-                        aria-label="マイページ"
-                      >
-                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                      </Link>
-
-                      {/* マイページリンク (PCのみ表示) */}
-                      <Link 
-                        href="/mypage" 
-                        className={`hidden md:flex text-xs sm:text-sm font-bold items-center gap-1.5 px-3 py-1.5 rounded-full transition ${
-                          pathname === '/mypage'
-                            ? 'bg-[#EEA51A] text-white shadow-md'
-                            : 'text-stone-600 hover:text-[#EEA51A] bg-white border border-stone-200 hover:shadow-sm'
-                        }`}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                        <span>マイページ</span>
-                        {pathname !== '/mypage' && <span className="w-1.5 h-1.5 rounded-full bg-[#EEA51A]"></span>}
-                      </Link>
-                    </>
-                  ) : (
-                    <Link 
-                      href="/login" 
-                      className="hidden md:block bg-[#EEA51A] text-white text-xs px-5 py-2.5 rounded-full font-bold hover:bg-[#D99000] transition shadow-md"
-                    >
-                      ログイン / 登録
-                    </Link>
-                  )}
-
-                  {/* ハンバーガーメニューボタン */}
-                  <button 
-                    onClick={() => setIsMenuOpen(true)}
-                    className="p-2 rounded-lg text-stone-600 hover:bg-stone-200 transition focus:outline-none flex-shrink-0 w-10 h-10 flex items-center justify-center"
-                    aria-label="メニューを開く"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
-                  </button>
-                </>
-              )}
             </div>
-          </div>
-        </header>
-      </div>
 
-      {/* 全画面モーダルメニュー */}
-      {isMenuOpen && (
-        <div className="fixed inset-0 z-[9999] bg-[#F7F5F0] animate-in fade-in duration-200 flex flex-col">
-          
-          {/* モーダル内にも管理者バーを表示 */}
-          {isAdmin && (
-            <div className="bg-stone-800 text-white text-xs py-1 px-4 text-center font-bold tracking-wider flex-shrink-0">
-              🔧 管理者モードでログイン中
-            </div>
-          )}
-
-          {/* モーダルヘッダー */}
-          <div className="w-full border-b border-stone-200 bg-[#F7F5F0] flex-shrink-0">
-             <div className="max-w-6xl mx-auto px-4 sm:px-8 h-16 flex justify-between items-center">
-                <div className="h-8 sm:h-10 w-auto opacity-50 grayscale">
-                  <img src="/logo.png" alt="Anandayoga" className="h-full w-auto object-contain" />
-                </div>
-                
-                {/* 閉じるボタン */}
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <button 
-                    onClick={closeMenu}
-                    className="p-2 rounded-lg text-stone-500 hover:bg-stone-200 transition focus:outline-none flex-shrink-0 w-10 h-10 flex items-center justify-center"
-                    aria-label="閉じる"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 6 6 18" />
-                      <path d="m6 6 12 12" />
-                    </svg>
-                  </button>
-                </div>
-             </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 pb-20">
-            <div className="max-w-md mx-auto grid gap-6">
-              
-              {/* 上部アクションボタンエリア */}
-              <div className="flex flex-col gap-2">
-                 {user ? (
-                   <div className="flex gap-2 w-full">
-                     <Link 
-                       href="/mypage" 
-                       onClick={closeMenu} 
-                       className="flex-1 bg-[#EEA51A] text-white font-bold py-2.5 rounded-xl text-center shadow-md hover:bg-[#D99000] transition flex items-center justify-center gap-2 text-sm"
-                     >
-                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                       <span>マイページ</span>
-                     </Link>
-                     <button 
-                       onClick={handleLogout} 
-                       className="flex-1 bg-white text-stone-500 font-bold py-2.5 rounded-xl border-2 border-stone-200 hover:bg-stone-50 transition text-center text-sm"
-                     >
-                       ログアウト
-                     </button>
-                   </div>
-                 ) : (
+            {/* 右側エリア: ログイン/マイページボタン (テキストあり) */}
+            <div className="flex items-center gap-2 shrink-0">
+                {user ? (
+                   <Link 
+                     href="/mypage" 
+                     className="bg-[#EEA51A] text-white text-xs font-bold px-3 py-2 rounded-full shadow-md hover:bg-[#d99616] transition flex items-center gap-1"
+                   >
+                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                     マイページ
+                   </Link>
+                ) : (
                    <Link 
                      href="/login" 
-                     onClick={closeMenu} 
-                     className="w-full bg-[#EEA51A] text-white font-bold py-2.5 rounded-xl text-center shadow-md hover:bg-[#D99000] transition flex items-center justify-center gap-2 text-sm"
+                     className="bg-[#EEA51A] text-white text-xs font-bold px-3 py-2 rounded-full shadow-md hover:bg-[#d99616] transition flex items-center gap-1"
                    >
-                     <span className="text-lg">🔐</span> ログイン / 新規登録
+                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                     ログイン
                    </Link>
-                 )}
-              </div>
+                )}
+            </div>
 
-              {/* ユーザーメニュー */}
-              <div className="space-y-2">
-                <h3 className="text-[10px] font-bold text-stone-400 tracking-wider mb-1 px-2">MENU</h3>
-                <ul className="space-y-1">
-                  <li>
-                    <Link href="/" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
-                      <span className="text-lg w-6 text-center">📅</span> 予約カレンダー
-                    </Link>
-                  </li>
-                  {/* メニュー内マイページリンク（アイコン化） */}
-                  {user && (
-                    <li>
-                      <Link href="/mypage" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
-                        <span className="w-6 flex justify-center text-stone-700">
-                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                        </span>
-                        マイページ
-                      </Link>
-                    </li>
-                  )}
-                  <li>
+          </div>
+        </header>
+      </div> 
+
+      {/* 追従型メニューボタン (FAB) */}
+      <button 
+        onClick={() => setIsMenuOpen(!isMenuOpen)}
+        className={`menu-fab fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 border-[#EEA51A] bg-white/95 backdrop-blur-sm hover:bg-white
+          ${isMenuOpen ? 'open' : ''}
+        `}
+        aria-label="メニューを開く"
+        style={{ zIndex: 9999 }}
+      >
+        {isMenuOpen ? (
+          <>
+             <span className="text-stone-400 text-xl leading-none mb-0.5">✕</span>
+             <span className="text-[9px] font-bold text-stone-400 tracking-widest">CLOSE</span>
+          </>
+        ) : (
+          <>
+             <img src="/img/icon.png" alt="" className="w-9 h-9 object-contain" />
+             <span className="text-[9px] font-bold text-[#EEA51A] tracking-widest">MENU</span>
+          </>
+        )}
+      </button>
+
+      {/* メニューオーバーレイ */}
+      <div 
+        className={`fixed inset-0 z-[1900] transition-all duration-300 ease-in-out ${
+          isMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'
+        }`}
+        style={{
+            background: '#F9F8F6',
+            paddingTop: isAdmin ? '76px' : '56px'
+        }}
+      >
+        <div className="scrollbar-hide relative w-full h-full flex flex-col p-6 overflow-y-auto max-w-[480px] mx-auto pb-24">
+            
+            {/* メニュー内ログインエリア */}
+            <div className="mb-8 mt-2">
+              {user ? (
+                 <div className="flex gap-3">
                     <button 
-                      onClick={() => setContactModalOpen(true)} 
-                      className="w-full text-left text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition"
+                      onClick={handleLogout} 
+                      className="w-full bg-white text-stone-600 font-bold py-3 rounded-lg shadow-sm border border-stone-200 text-center hover:bg-stone-50 transition text-sm flex items-center justify-center gap-2"
                     >
-                      <span className="text-lg w-6 text-center">✉️</span> お問い合わせ
+                      <span>🚪</span> ログアウト
                     </button>
-                  </li>
-                  <li>
-                    <a href="https://ananda-yogaschool.com/" target="_blank" rel="noopener noreferrer" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition">
-                      <span className="text-lg w-6 text-center">🌐</span> 公式サイト
-                      <svg className="w-3 h-3 text-stone-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-
-              {/* 管理者メニュー */}
-              {isAdmin && (
-                <div className="space-y-2 pt-4 border-t border-stone-200">
-                  <h3 className="text-[10px] font-bold text-stone-400 tracking-wider mb-1 px-2">ADMIN MENU</h3>
-                  <ul className="space-y-1">
-                    <li>
-                      <Link href="/admin/checkin" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition" prefetch={false}>
-                        <span className="text-lg w-6 text-center">📋</span> 予約・チェックイン
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/admin?tab=lessons" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition" prefetch={false}>
-                        <span className="text-lg w-6 text-center">✏️</span> 予約管理 (クラス登録)
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/admin?tab=users" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition" prefetch={false}>
-                        <span className="text-lg w-6 text-center">👥</span> ユーザー管理
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/admin?tab=plans" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition" prefetch={false}>
-                        <span className="text-lg w-6 text-center">💳</span> プラン管理
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/admin?tab=announcements" onClick={closeMenu} className="text-sm font-bold text-stone-700 hover:text-[#EEA51A] hover:bg-white flex items-center gap-3 p-2 rounded-lg transition" prefetch={false}>
-                        <span className="text-lg w-6 text-center">🔔</span> お知らせ管理
-                      </Link>
-                    </li>
-                  </ul>
-                </div>
+                 </div>
+              ) : (
+                 <Link 
+                    href="/login" 
+                    onClick={closeMenu}
+                    className="block w-full bg-[#EEA51A] text-white font-bold py-3 rounded-lg shadow-md text-center hover:bg-[#d99616] transition tracking-wider"
+                 >
+                   ログイン / 会員登録
+                 </Link>
               )}
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* お問い合わせフォームモーダル */}
+            {/* 一般メニュー (コンテンツ変更: 予約、養成講座、お問い合わせ) */}
+            <div className="mb-8">
+               <h3 className="text-[10px] font-bold text-stone-400 mb-3 tracking-widest pl-1">MENU</h3>
+               <div className="grid grid-cols-2 gap-2">
+                  <MenuTile 
+                    href="/booking" 
+                    onClick={closeMenu}
+                    icon={<span className="text-xl">📅</span>}
+                    label="予約カレンダー" 
+                  />
+                  {/* ▼▼▼ 追加: 養成講座 ▼▼▼ */}
+                  <MenuTile 
+                    href="/program" 
+                    onClick={closeMenu}
+                    icon={<span className="text-xl">🎓</span>}
+                    label="養成講座" 
+                  />
+                  {/* ▼▼▼ お問い合わせ (ボタン) ▼▼▼ */}
+                  <button 
+                    onClick={() => { setContactModalOpen(true); setIsMenuOpen(false); }}
+                    className="flex flex-row items-center justify-start p-3 rounded-lg transition shadow-sm hover:shadow-md border bg-white border-stone-100 hover:border-[#EEA51A] hover:bg-[#FFFDF5] h-full gap-3"
+                  >
+                    <div className="text-[#EEA51A] flex-shrink-0"><span className="text-xl">✉️</span></div>
+                    <span className="text-xs font-bold text-stone-700 leading-tight text-left">お問い合わせ</span>
+                  </button>
+               </div>
+            </div>
+
+            {/* 管理者メニュー */}
+            {isAdmin && (
+              <div className="mb-8">
+                 <h3 className="text-[10px] font-bold text-stone-400 mb-3 tracking-widest pl-1 uppercase">Admin Menu</h3>
+                 <div className="grid grid-cols-2 gap-2">
+                    <MenuTile href="/admin/checkin" onClick={closeMenu} icon={<span className="text-xl">📋</span>} label="予約・チェックイン" isAdmin />
+                    <MenuTile href="/admin/classes" onClick={closeMenu} icon={<span className="text-xl">✏️</span>} label="予約管理（クラス）" isAdmin />
+                    <MenuTile href="/admin/users" onClick={closeMenu} icon={<span className="text-xl">👥</span>} label="ユーザー管理" isAdmin />
+                    <MenuTile href="/admin/plans" onClick={closeMenu} icon={<span className="text-xl">💳</span>} label="プラン管理" isAdmin />
+                    <MenuTile href="/admin/news" onClick={closeMenu} icon={<span className="text-xl">🔔</span>} label="お知らせ管理" isAdmin />
+                 </div>
+              </div>
+            )}
+            
+            <div className="mt-auto text-center text-[10px] text-stone-400 py-2">
+               © 2026 ANANDA YOGA
+            </div>
+        </div>
+      </div>
+
+      {/* お問い合わせモーダル (変更なし) */}
       {contactModalOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[10000] p-4 backdrop-blur-sm" onClick={() => setContactModalOpen(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
+           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-stone-700 mb-6 flex items-center gap-2">
               <span className="text-2xl">✉️</span> {contactForm.subject.includes('予約希望') ? '予約リクエスト' : 'お問い合わせ'}
             </h3>
             
             <form onSubmit={handleContactSubmit} className="space-y-4">
-              {/* 未ログイン時のみ名前・メアド入力欄を表示 */}
               {!user && (
                 <>
                   <div>
@@ -440,5 +412,43 @@ export default function Header() {
         </div>
       )}
     </>
+  );
+}
+
+// MenuTileコンポーネント (変更なし)
+function MenuTile({ href, icon, label, onClick, isExternal = false, isAdmin = false }: { 
+  href: string; 
+  icon: React.ReactNode; 
+  label: string; 
+  onClick?: () => void;
+  isExternal?: boolean;
+  isAdmin?: boolean;
+}) {
+  return (
+    <Link 
+      href={href} 
+      onClick={onClick}
+      target={isExternal ? "_blank" : undefined}
+      rel={isExternal ? "noopener noreferrer" : undefined}
+      className={`
+        flex flex-row items-center justify-start p-3 rounded-lg transition shadow-sm hover:shadow-md border h-full gap-3
+        ${isAdmin 
+          ? 'bg-white border-stone-200 hover:border-[#EEA51A] hover:bg-[#FFFDF5]' 
+          : 'bg-white border-stone-100 hover:border-[#EEA51A] hover:bg-[#FFFDF5]'
+        }
+      `}
+    >
+      <div className={`flex-shrink-0 ${isAdmin ? 'text-stone-600' : 'text-[#EEA51A]'}`}>
+        {icon}
+      </div>
+      <span className="text-xs font-bold text-stone-700 leading-tight text-left">
+        {label}
+      </span>
+      {isExternal && (
+        <span className="ml-auto text-stone-300">
+           <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </span>
+      )}
+    </Link>
   );
 }

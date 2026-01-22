@@ -41,7 +41,7 @@ export default function LoginPage() {
           password,
         });
         if (error) throw error;
-        router.push('/');
+        router.push('/booking');
         router.refresh();
 
       } else if (mode === 'signup') {

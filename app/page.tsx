@@ -1,865 +1,502 @@
-'use client';
-
-import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, 
-  startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay, isSameMonth, 
-  parseISO, startOfDay, endOfDay
-} from 'date-fns';
-import { ja } from 'date-fns/locale';
+import NewsSection, { News } from './components/NewsSection';
+import ScheduleSection from './components/ScheduleSection';
 
-type Lesson = {
-  id: string;
-  title: string;
-  instructor_name: string;
-  start_time: string;
-  end_time: string;
-  difficulty_level: string;
-  capacity: number;
-  type: string;
-  reservations: { id: string; user_id: string }[];
-};
+// microCMSからニュースを取得する関数
+async function getNews() {
+  const apiKey = process.env.MICROCMS_API_KEY;
+  if (!apiKey) return [];
 
-type ViewMode = 'day' | 'week' | 'month';
-
-export default function Home() {
-  const router = useRouter();
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [user, setUser] = useState<any>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [lessonsLoading, setLessonsLoading] = useState(false);
-  const [reservingId, setReservingId] = useState<string | null>(null);
-
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('month');
-  const [now, setNow] = useState(new Date());
-
-  // モーダル用state
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [targetLesson, setTargetLesson] = useState<Lesson | null>(null);
-  const [visitorMode, setVisitorMode] = useState(false);
-  const [visitorForm, setVisitorForm] = useState({ fullName: '', email: '', phone: '', notes: '' });
-
-  const [contactModalOpen, setContactModalOpen] = useState(false);
-  const [contactForm, setContactForm] = useState({ subject: '', body: '' });
-  const [sendingContact, setSendingContact] = useState(false);
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        
-        if (profile) {
-          setUserRole(profile.role);
-        }
-      }
-      setLoading(false);
-    };
-    fetchUser();
-  }, []);
-
-  const fetchLessons = useCallback(async () => {
-    setLessonsLoading(true);
-    let start: Date, end: Date;
-
-    if (viewMode === 'day') {
-      start = startOfDay(currentDate);
-      end = endOfDay(currentDate);
-    } else if (viewMode === 'week') {
-      start = startOfWeek(currentDate, { weekStartsOn: 1 });
-      end = endOfWeek(currentDate, { weekStartsOn: 1 });
-    } else {
-      const monthStart = startOfMonth(currentDate);
-      const monthEnd = endOfMonth(currentDate);
-      start = startOfWeek(monthStart, { weekStartsOn: 1 });
-      end = endOfWeek(monthEnd, { weekStartsOn: 1 });
-    }
-
-    const fetchEnd = addDays(end, 1);
-
-    const { data: lessonsData } = await supabase
-      .from('lessons')
-      .select('*, reservations(id, user_id)')
-      .gte('start_time', start.toISOString())
-      .lt('start_time', fetchEnd.toISOString())
-      .order('start_time', { ascending: true });
-    
-    if (lessonsData) {
-      setLessons(lessonsData as any);
-    }
-    setLessonsLoading(false);
-  }, [currentDate, viewMode]);
-
-  useEffect(() => {
-    fetchLessons();
-  }, [fetchLessons]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setUserRole(null);
-    router.refresh();
-    window.location.reload(); 
-  };
-
-  const handleReserveClick = (lesson: Lesson) => {
-    const lessonStart = new Date(lesson.start_time);
-    const reservationDeadline = new Date(lessonStart.getTime() - 60 * 60 * 1000);
-    if (lesson.type !== 'personal' && now > reservationDeadline) {
-      alert('予約受付時間を過ぎています（開始1時間前まで）');
-      return;
-    }
-
-    if (user) {
-      if (lesson.type === 'personal') {
-        openPersonalRequest(lesson);
-      } else {
-        handleMemberReserve(lesson.id, lesson.title, lesson.start_time, lesson.instructor_name);
-      }
-    } else {
-      setTargetLesson(lesson);
-      setVisitorMode(false);
-      setVisitorForm({ fullName: '', email: '', phone: '', notes: '' });
-      setShowLoginModal(true);
-    }
-  };
-
-  const handleMemberReserve = async (lessonId: string, lessonTitle: string, startTime: string, instructorName: string) => {
-    if (!confirm(`「${lessonTitle}」を予約しますか？`)) return;
-
-    setReservingId(lessonId);
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, full_name, email')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile) {
-      alert('会員データが見つかりません。再ログインしてください。');
-      setReservingId(null);
-      return;
-    }
-
-    const { error } = await supabase.from('reservations').insert([
-      {
-        user_id: user.id,
-        lesson_id: lessonId,
-        status: 'confirmed',
-      },
-    ]);
-
-    if (error) {
-      alert(`予約に失敗しました: ${error.message}`);
-    } else {
-      const formattedDate = format(parseISO(startTime), 'yyyy年M月d日(E) HH:mm', { locale: ja });
-      
-      try {
-        await fetch('/api/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userEmail: profile.email || user.email,
-            userName: profile.full_name || 'ゲスト',
-            lessonTitle: lessonTitle,
-            lessonDate: formattedDate,
-            instructorName: instructorName
-          }),
-        });
-        alert('🎉 予約が完了しました！確認メールをお送りしました。');
-      } catch (err) {
-        alert('予約は完了しましたが、メール送信時にエラーが発生しました。');
-      }
-
-      fetchLessons();
-    }
-    setReservingId(null);
-  };
-
-  const handleCancel = async (reservationId: string, lessonTitle: string, startTime: string, instructorName: string) => {
-    if (!confirm(`「${lessonTitle}」の予約をキャンセルしますか？`)) return;
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, email')
-      .eq('id', user.id)
-      .single();
-
-    const { error } = await supabase
-      .from('reservations')
-      .delete()
-      .eq('id', reservationId);
-
-    if (error) {
-      alert('キャンセルに失敗しました');
-    } else {
-      if (profile) {
-        const formattedDate = format(parseISO(startTime), 'yyyy年M月d日(E) HH:mm', { locale: ja });
-        fetch('/api/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'cancellation',
-            userEmail: profile.email || user.email,
-            userName: profile.full_name || 'ゲスト',
-            lessonTitle: lessonTitle,
-            lessonDate: formattedDate,
-            instructorName: instructorName
-          }),
-        }).catch(err => console.error('Cancel email failed:', err));
-      }
-      alert('予約をキャンセルしました');
-      fetchLessons();
-    }
-  };
-
-  const openPersonalRequest = (lesson: Lesson) => {
-    if (!user) {
-      setTargetLesson(lesson);
-      setVisitorMode(false);
-      setVisitorForm({ fullName: '', email: '', phone: '', notes: '' });
-      setShowLoginModal(true);
-      return;
-    }
-    setContactForm({
-      subject: `パーソナル予約希望: ${lesson.title}`,
-      body: `希望日時:\n・第一希望: \n・第二希望: \n\nその他ご要望:\n`
+  try {
+    const res = await fetch('https://ananda.microcms.io/api/v1/news?limit=4', {
+      headers: { 'X-MICROCMS-API-KEY': apiKey },
+      next: { revalidate: 60 },
     });
-    setContactModalOpen(true);
-  };
-
-  const handleContactSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!contactForm.subject || !contactForm.body) return;
-    setSendingContact(true);
-
-    try {
-      let userName = 'ゲスト';
-      let userEmail = user?.email;
-
-      if (user) {
-        const { data: profile } = await supabase.from('profiles').select('email, full_name').eq('id', user.id).single();
-        if (profile) {
-          userName = profile.full_name || 'ゲスト';
-          userEmail = profile.email || user.email;
-        }
-      }
-
-      const res = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'contact',
-          userEmail: userEmail,
-          userName: userName,
-          contactSubject: contactForm.subject,
-          contactBody: contactForm.body
-        }),
-      });
-
-      if (!res.ok) throw new Error('送信失敗');
-
-      alert('リクエストを送信しました。\n担当者からの連絡をお待ちください。');
-      setContactModalOpen(false);
-      setContactForm({ subject: '', body: '' });
-
-    } catch (err) {
-      alert('送信に失敗しました。');
-    }
-    setSendingContact(false);
-  };
-
-  const handleVisitorReserve = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!targetLesson || !visitorForm.fullName || !visitorForm.email) return;
-
-    if (targetLesson.type === 'personal' && !visitorForm.notes) {
-      alert('希望日時をご記入ください');
-      return;
-    }
-
-    if (!confirm(`「${targetLesson.title}」${targetLesson.type === 'personal' ? 'のリクエストを送信' : 'を予約'}しますか？`)) return;
-
-    setReservingId(targetLesson.id);
-
-    try {
-      if (targetLesson.type === 'personal') {
-        const res = await fetch('/api/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'contact',
-            userEmail: visitorForm.email,
-            userName: `${visitorForm.fullName} (ビジター)`,
-            contactSubject: `【ビジター予約リクエスト】${targetLesson.title}`,
-            contactBody: `
-■予約希望クラス
-${targetLesson.title}
-
-■ビジター情報
-お名前: ${visitorForm.fullName}
-Email: ${visitorForm.email}
-電話: ${visitorForm.phone}
-
-■希望日時・備考
-${visitorForm.notes}
-            `
-          }),
-        });
-
-        if (!res.ok) throw new Error('送信失敗');
-        alert('リクエストを送信しました。\n担当者からの連絡をお待ちください。');
-
-      } else {
-        const formattedDate = format(parseISO(targetLesson.start_time), 'yyyy年M月d日(E) HH:mm', { locale: ja });
-        const res = await fetch('/api/visitor-reserve', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fullName: visitorForm.fullName,
-            email: visitorForm.email,
-            phone: visitorForm.phone,
-            lessonId: targetLesson.id,
-            lessonTitle: targetLesson.title,
-            lessonDate: formattedDate,
-            instructorName: targetLesson.instructor_name
-          }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || '予約に失敗しました');
-
-        alert('🎉 予約が完了しました！\n確認メールをお送りしました。\n\n当日は受付にて簡単な会員登録をお願いいたします。');
-      }
-      
-      setShowLoginModal(false);
-      fetchLessons();
-    } catch (err: any) {
-      alert(`エラー: ${err.message}`);
-    }
-    setReservingId(null);
-  };
-
-  const getAvailability = (lesson: Lesson) => {
-    if (lesson.type === 'personal') {
-      return { icon: '◇', text: '日程調整', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200', isFull: false };
-    }
-    if (lesson.type === 'training') {
-      return { icon: '-', text: '予約不可', color: 'text-slate-600', bg: 'bg-slate-100', border: 'border-slate-300', isFull: true };
-    }
-
-    const count = lesson.reservations ? lesson.reservations.length : 0;
-    const capacity = lesson.capacity || 15;
-    const ratio = count / capacity;
-
-    if (count >= capacity) {
-      return { icon: '✕', text: '満員', color: 'text-stone-400', bg: 'bg-stone-100', border: 'border-stone-200', isFull: true };
-    }
-    if (ratio >= 0.7) {
-      return { icon: '△', text: '残りわずか', color: 'text-red-500', bg: 'bg-red-50', border: 'border-red-200', isFull: false };
-    }
-    return { icon: '〇', text: '空席あり', color: 'text-[#EEA51A]', bg: 'bg-[#FFF8E1]', border: 'border-[#FCEFCF]', isFull: false };
-  };
-
-  const handlePrev = () => {
-    if (viewMode === 'day') setCurrentDate(d => subDays(d, 1));
-    if (viewMode === 'week') setCurrentDate(d => subWeeks(d, 1));
-    if (viewMode === 'month') setCurrentDate(d => subMonths(d, 1));
-  };
-  const handleNext = () => {
-    if (viewMode === 'day') setCurrentDate(d => addDays(d, 1));
-    if (viewMode === 'week') setCurrentDate(d => addWeeks(d, 1));
-    if (viewMode === 'month') setCurrentDate(d => addMonths(d, 1));
-  };
-  const handleToday = () => setCurrentDate(new Date());
-
-  const renderMonthCalendar = () => {
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(currentDate);
-    const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
-    const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
-
-    const rows = [];
-    let days = [];
-    let day = startDate;
-
-    while (day <= endDate) {
-      for (let i = 0; i < 7; i++) {
-        const cloneDay = day;
-        const formattedDate = format(day, 'd');
-        const dayLessons = lessons.filter(l => isSameDay(parseISO(l.start_time), cloneDay));
-        const hasLesson = dayLessons.length > 0;
-        const isToday = isSameDay(day, new Date());
-
-        days.push(
-          <div
-            key={day.toString()}
-            onClick={() => {
-              setCurrentDate(cloneDay);
-              setViewMode('day');
-            }}
-            className={`
-              min-h-[100px] p-1 cursor-pointer transition relative flex flex-col border-r border-b border-stone-200
-              ${isToday 
-                ? 'bg-[#FFF8E1] z-10 shadow-sm' 
-                : `hover:bg-[#FFF8E1] ${!isSameDay(day, new Date()) && !isSameMonth(day, monthStart) ? 'bg-stone-50/50 text-stone-300' : 'bg-white'}`
-              }
-            `}
-          >
-            <div className={`text-xs font-bold text-center mb-1 ${isToday ? 'text-[#EEA51A]' : 'text-stone-600'}`}>
-              {formattedDate}
-            </div>
-            
-            {hasLesson && (
-              <div className="flex flex-col gap-1 overflow-hidden">
-                {dayLessons.map(l => {
-                  let status = getAvailability(l);
-                  
-                  const lessonStart = new Date(l.start_time);
-                  const reservationDeadline = new Date(lessonStart.getTime() - 60 * 60 * 1000);
-                  const isReservableTime = now <= reservationDeadline;
-                  
-                  if (!isReservableTime && l.type === 'normal') {
-                    status = { 
-                      icon: '-', 
-                      text: '終了', 
-                      color: 'text-stone-400', 
-                      bg: 'bg-stone-100', 
-                      border: 'border-stone-200', 
-                      isFull: false 
-                    };
-                  }
-                  
-                  const isReserved = user ? l.reservations.some(r => r.user_id === user.id) : false;
-
-                  return (
-                    <div key={l.id} className={`text-[10px] ${isReserved ? 'bg-green-100 text-green-800 border-green-200' : `${status.bg} ${status.color} ${status.border}`} px-1.5 py-0.5 rounded truncate leading-tight border`}>
-                      <span className="font-bold mr-1">{isReserved ? '✓' : status.icon}</span>
-                      {l.type === 'personal' ? '調整' : (
-                         <span className="mr-1">{format(parseISO(l.start_time), 'HH:mm')}-{format(parseISO(l.end_time), 'HH:mm')}</span>
-                      )}
-                      {l.title}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-        day = addDays(day, 1);
-      }
-      rows.push(<div className="grid grid-cols-7" key={day.toString()}>{days}</div>);
-      days = [];
-    }
-    return (
-      <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden mb-6">
-         <div className="grid grid-cols-7 bg-[#FDFBF7] border-b border-stone-200 text-center py-3 text-xs font-bold text-stone-500 tracking-wider">
-          <div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div className="text-blue-400">土</div><div className="text-red-400">日</div>
-        </div>
-        {rows}
-      </div>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#F7F5F0] flex flex-col items-center justify-center">
-        <div className="w-32 animate-pulse">
-          <img src="/logo.png" alt="Loading..." className="w-full h-auto object-contain" />
-        </div>
-      </div>
-    );
+    if (!res.ok) throw new Error('Failed to fetch news');
+    const data = await res.json();
+    return data.contents as News[];
+  } catch (error) {
+    console.error('Error fetching news:', error);
+    return [];
   }
+}
 
+// microCMSからスケジュールを取得する関数
+async function getSchedules() {
+  const apiKey = process.env.MICROCMS_API_KEY;
+  if (!apiKey) return [];
+
+  try {
+    const res = await fetch('https://ananda.microcms.io/api/v1/news?filters=schedule[equals]true&limit=3', {
+      headers: { 'X-MICROCMS-API-KEY': apiKey },
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) throw new Error('Failed to fetch schedules');
+    const data = await res.json();
+    return data.contents as News[];
+  } catch (error) {
+    console.error('Error fetching schedules:', error);
+    return [];
+  }
+}
+
+export default async function HomePage() {
+  // 並行してデータを取得
+  const newsListData = getNews();
+  const schedulesData = getSchedules();
+  const [newsList, schedules] = await Promise.all([newsListData, schedulesData]);
+  
   return (
-    <div className="min-h-screen bg-[#F7F5F0] pb-20 font-sans text-stone-700 sm:p-8">
-      <div className="max-w-4xl mx-auto">
-        {/* コンテンツエリア */}
-        <div className="px-4 sm:px-0">
-          
-          {/* 予約に関する注意書き（簡略化版） */}
-          <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-200 mb-6 text-center text-xs text-stone-500 leading-relaxed">
-            <span className="text-[#EEA51A] mr-1">ℹ️</span>
-            予約・キャンセルは<span className="font-bold text-stone-600">開始1時間前</span>まで
-            <span className="mx-2 text-stone-300 hidden sm:inline">|</span>
-            <br className="sm:hidden" />
-            パーソナルは<span className="font-bold text-stone-600">前日</span>まで
-          </div>
-          
-          {/* コントロールバー */}
-          <div className="flex flex-col gap-4 mb-6">
-            <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
-              <div className="flex gap-2">
-                  <button onClick={handlePrev} className="w-8 h-8 flex items-center justify-center hover:bg-stone-100 rounded-full text-stone-500">←</button>
-                  <button onClick={handleNext} className="w-8 h-8 flex items-center justify-center hover:bg-stone-100 rounded-full text-stone-500">→</button>
-              </div>
-              <div className="font-bold text-lg text-stone-700">
-                {format(currentDate, viewMode === 'day' ? 'M月d日 (E)' : 'yyyy年M月', { locale: ja })}
-              </div>
-              <button onClick={handleToday} className="text-xs border border-stone-300 px-3 py-1 rounded-full hover:bg-stone-50 font-bold text-stone-500">今日</button>
-            </div>
+    // ▼ ページ全体を包むコンテナ
+    <div className="min-h-screen w-full bg-[#333] relative">
 
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-              <div className="flex bg-white rounded-full p-1 shadow-sm border border-stone-200 w-full sm:w-auto justify-center">
-                {(['day', 'week', 'month'] as ViewMode[]).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setViewMode(mode)}
-                    className={`px-5 py-1.5 rounded-full text-sm font-bold transition flex-1 sm:flex-none ${
-                      viewMode === mode 
-                        ? 'bg-[#EEA51A] text-white shadow' 
-                        : 'text-stone-500 hover:bg-stone-50'
-                    }`}
-                  >
-                    {mode === 'day' ? '日' : mode === 'week' ? '週' : '月'}
-                  </button>
-                ))}
-              </div>
-              
-              <div className="flex gap-2 text-[10px] sm:text-xs text-stone-500 bg-white/50 px-3 py-1 rounded-full flex-wrap justify-center">
-                <span className="flex items-center gap-1"><span className="text-[#EEA51A] font-bold">〇</span> 空席あり</span>
-                <span className="flex items-center gap-1"><span className="text-red-500 font-bold">△</span> 残りわずか</span>
-                <span className="flex items-center gap-1"><span className="text-stone-400 font-bold">✕</span> 満員</span>
-                <span className="flex items-center gap-1"><span className="text-green-600 font-bold">✓</span> 予約済</span>
-              </div>
-            </div>
-          </div>
-
-          {/* カレンダー表示 */}
-          {viewMode === 'month' && renderMonthCalendar()}
-
-          {/* リスト表示 */}
-          {lessonsLoading ? (
-            <div className="text-center py-20 text-stone-400">読み込み中...</div>
-          ) : (
-            <div className="space-y-4">
-              {(() => {
-                let targetDates: Date[] = [];
-                if (viewMode === 'month') {
-                  const uniqueDates = Array.from(new Set(lessons.map(l => format(parseISO(l.start_time), 'yyyy-MM-dd')))).sort();
-                  targetDates = uniqueDates.map(d => parseISO(d));
-                  if (targetDates.length === 0) return null;
-                } else {
-                  let start: Date, end: Date;
-                  if (viewMode === 'day') {
-                    start = new Date(currentDate);
-                    end = new Date(currentDate);
-                  } else {
-                    start = startOfWeek(currentDate, { weekStartsOn: 1 });
-                    end = endOfWeek(currentDate, { weekStartsOn: 1 });
-                  }
-                  let d = start;
-                  while (d <= end) {
-                    targetDates.push(d);
-                    d = addDays(d, 1);
-                  }
-                }
-
-                return targetDates.map(dateObj => {
-                  const dateKey = format(dateObj, 'yyyy-MM-dd');
-                  const dayLessons = lessons.filter(l => format(parseISO(l.start_time), 'yyyy-MM-dd') === dateKey);
-
-                  if (viewMode === 'month' && dayLessons.length === 0) return null;
-
-                  return (
-                    <div key={dateKey} className="mb-6">
-                      <h3 className={`font-bold text-sm mb-3 pl-2 border-l-4 flex items-center gap-2 ${isSameDay(dateObj, new Date()) ? 'border-[#EEA51A] text-[#EEA51A]' : 'border-stone-300 text-stone-600'}`}>
-                        {format(dateObj, 'M月d日 (E)', { locale: ja })}
-                        {isSameDay(dateObj, new Date()) && <span className="text-[10px] bg-[#EEA51A]/20 text-[#EEA51A] px-2 py-0.5 rounded-full">Today</span>}
-                      </h3>
-
-                      <div className="space-y-4">
-                        {dayLessons.length === 0 ? (
-                          <div className="p-4 text-xs text-stone-400 bg-white/50 rounded-xl border border-dashed border-stone-200">
-                            レッスンはありません
-                          </div>
-                        ) : (
-                          dayLessons.map((lesson) => {
-                            const status = getAvailability(lesson);
-                            const userReservation = user ? lesson.reservations.find(r => r.user_id === user.id) : null;
-                            const isReserved = !!userReservation;
-
-                            const lessonStart = new Date(lesson.start_time);
-                            const reservationDeadline = new Date(lessonStart.getTime() - 60 * 60 * 1000);
-                            const isReservableTime = now <= reservationDeadline;
-
-                            let cardStyle = isReserved ? 'bg-[#F0FDF4] border-green-200' : 'bg-white border-stone-100 hover:shadow-md hover:border-[#EEA51A]/30';
-                            if (lesson.type === 'personal') cardStyle = 'bg-indigo-50/30 border-indigo-100 hover:border-indigo-300';
-                            if (lesson.type === 'training') cardStyle = 'bg-slate-50 border-slate-200 hover:border-slate-300';
-
-                            return (
-                              <div key={lesson.id} className={`group relative rounded-2xl p-5 shadow-sm border transition-all duration-200 ${cardStyle}`}>
-                                
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      {lesson.type === 'personal' ? (
-                                         <span className="text-lg font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
-                                            日程調整
-                                         </span>
-                                      ) : (
-                                         <span className="text-xl font-mono text-stone-700 font-bold bg-stone-100/50 px-2 rounded">
-                                           {format(parseISO(lesson.start_time), 'HH:mm')} <span className="text-sm text-stone-400 font-normal mx-1">-</span> {format(parseISO(lesson.end_time), 'HH:mm')}
-                                         </span>
-                                      )}
-                                      
-                                      {/* ステータス表示 */}
-                                      {isReserved ? (
-                                        <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200 flex items-center gap-1 ml-1">
-                                          <span className="text-green-600">✓</span> 予約済み
-                                        </span>
-                                      ) : lesson.type === 'normal' && !isReservableTime ? (
-                                        <span className="bg-stone-100 text-stone-500 text-[10px] font-bold px-2 py-0.5 rounded-full border border-stone-200 ml-1">
-                                          - 受付終了
-                                        </span>
-                                      ) : (
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${status.bg} ${status.color} ${status.border} ml-1`}>
-                                          {status.icon} {status.text}
-                                        </span>
-                                      )}
-                                    </div>
-                                    
-                                    <h4 className={`font-bold text-lg mb-2 leading-tight ${isReserved ? 'text-green-900' : 'text-stone-800 group-hover:text-[#EEA51A] transition'}`}>
-                                      {lesson.title}
-                                    </h4>
-                                    
-                                    <div className="flex flex-wrap items-center gap-3 text-xs text-stone-500">
-                                      <span className="flex items-center gap-1 bg-stone-50 px-2 py-1 rounded-md border border-stone-100">
-                                        <span className="opacity-60">👤</span> {lesson.instructor_name}
-                                      </span>
-                                      {lesson.type === 'normal' && (
-                                        <span className="flex items-center gap-1 bg-stone-50 px-2 py-1 rounded-md border border-stone-100">
-                                          <span className="text-orange-500 font-bold opacity-80">★</span> {lesson.difficulty_level}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="w-full sm:w-auto mt-2 sm:mt-0 flex flex-col items-stretch sm:items-end gap-2">
-                                    {isReserved ? (
-                                        // 予約済み -> キャンセルボタン
-                                        <button 
-                                          onClick={() => handleCancel(userReservation!.id, lesson.title, lesson.start_time, lesson.instructor_name)}
-                                          className="w-full sm:w-32 bg-white text-red-500 border border-red-200 text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 hover:bg-red-50 hover:border-red-400 shadow-sm"
-                                        >
-                                          キャンセル
-                                        </button>
-                                    ) : lesson.type === 'personal' ? (
-                                        // パーソナル -> リクエストボタン (満員時は受付終了)
-                                        <button 
-                                          onClick={() => openPersonalRequest(lesson)}
-                                          disabled={status.isFull}
-                                          className={`w-full sm:w-32 text-white text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 shadow-md ${
-                                            status.isFull 
-                                              ? 'bg-stone-400 cursor-not-allowed' 
-                                              : 'bg-indigo-600 hover:bg-indigo-700'
-                                          }`}
-                                        >
-                                          {status.isFull ? '受付終了' : '予約リクエスト'}
-                                        </button>
-                                    ) : lesson.type === 'training' ? (
-                                        // 養成講座 -> ボタンなし (表示のみ)
-                                        <span className="text-xs text-slate-500 font-bold px-4 py-2 bg-slate-100 rounded-full border border-slate-200 text-center">
-                                           ※予約不可
-                                        </span>
-                                    ) : (
-                                        // 通常 -> 予約ボタン (未ログインでも押せる)
-                                        // ★修正: 満員 or 時間外の場合はボタン無効化
-                                        <button 
-                                          onClick={() => handleReserveClick(lesson)}
-                                          disabled={reservingId === lesson.id || status.isFull || !isReservableTime}
-                                          className={`w-full sm:w-32 text-white text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${
-                                            !isReservableTime
-                                              ? 'bg-stone-300' 
-                                              : status.isFull 
-                                                ? 'bg-stone-400' 
-                                                : 'bg-stone-800 hover:bg-[#EEA51A]'
-                                          }`}
-                                        >
-                                          {reservingId === lesson.id ? '予約中...' : !isReservableTime ? '受付終了' : status.isFull ? '満員' : '予約する'}
-                                        </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          )}
-        </div>
-
-        {/* ビジター予約モーダル */}
-        {showLoginModal && targetLesson && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setShowLoginModal(false)}>
-             <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
-              <h3 className="text-xl font-bold text-stone-700 mb-2">予約方法の選択</h3>
-              <p className="text-sm text-stone-500 mb-6">
-                予約するクラス: <span className="font-bold text-[#EEA51A]">{targetLesson.title}</span>
-              </p>
-
-              {!visitorMode ? (
-                <div className="space-y-4">
-                  <Link href="/login" className="block w-full bg-stone-800 text-white text-center py-4 rounded-xl font-bold shadow-md hover:bg-stone-700 transition">
-                    ログインして予約
-                    <span className="block text-[10px] font-normal opacity-70 mt-0.5">回数券や履歴を利用できます</span>
-                  </Link>
-                  
-                  <div className="relative text-center py-2">
-                    <hr className="border-stone-200" />
-                    <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-3 text-xs text-stone-400">または</span>
-                  </div>
-
-                  <button 
-                    onClick={() => setVisitorMode(true)}
-                    className="w-full bg-white border-2 border-[#EEA51A] text-[#EEA51A] py-4 rounded-xl font-bold hover:bg-[#FFF8E1] transition"
-                  >
-                    ビジターで予約
-                    <span className="block text-[10px] font-normal text-stone-400 mt-0.5">会員登録せずにお試し予約</span>
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleVisitorReserve} className="space-y-4 animate-fadeIn">
-                  <div>
-                    <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">お名前 (必須)</label>
-                    <input
-                      required
-                      placeholder="山田 花子"
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
-                      value={visitorForm.fullName}
-                      onChange={(e) => setVisitorForm({...visitorForm, fullName: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">メールアドレス (必須)</label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="example@email.com"
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
-                      value={visitorForm.email}
-                      onChange={(e) => setVisitorForm({...visitorForm, email: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">電話番号 (任意)</label>
-                    <input
-                      type="tel"
-                      placeholder="090-1234-5678"
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
-                      value={visitorForm.phone}
-                      onChange={(e) => setVisitorForm({...visitorForm, phone: e.target.value})}
-                    />
-                  </div>
-                  
-                  {/* パーソナルの場合のみ希望日時を表示 */}
-                  {targetLesson.type === 'personal' && (
-                    <div>
-                        <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">希望日時 (必須)</label>
-                        <textarea
-                          required
-                          placeholder="第一希望: 〇月〇日 10:00〜&#13;&#10;第二希望: 〇月〇日 14:00〜"
-                          className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none h-24"
-                          value={visitorForm.notes || ''}
-                          onChange={(e) => setVisitorForm({...visitorForm, notes: e.target.value})}
-                        />
-                    </div>
-                  )}
-                  
-                  <div className="pt-2 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setVisitorMode(false)}
-                      className="flex-1 bg-stone-100 text-stone-500 font-bold py-3 rounded-xl hover:bg-stone-200"
-                    >
-                      戻る
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={reservingId === targetLesson.id}
-                      className="flex-1 bg-[#EEA51A] text-white font-bold py-3 rounded-xl hover:bg-[#D99000] disabled:opacity-50 shadow-md"
-                    >
-                      {reservingId === targetLesson.id ? '送信中...' : targetLesson.type === 'personal' ? 'リクエスト' : '予約する'}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* お問い合わせフォームモーダル */}
-        {contactModalOpen && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setContactModalOpen(false)}>
-            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
-              <h3 className="text-xl font-bold text-stone-700 mb-6 flex items-center gap-2">
-                <span className="text-2xl">✉️</span> {contactForm.subject.includes('予約希望') ? '予約リクエスト' : 'お問い合わせ'}
-              </h3>
-              <form onSubmit={handleContactSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">件名</label>
-                  <input
-                    required
-                    value={contactForm.subject}
-                    onChange={e => setContactForm({...contactForm, subject: e.target.value})}
-                    placeholder="例: 予約の変更について"
-                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">お問い合わせ内容</label>
-                  <textarea
-                    required
-                    rows={5}
-                    value={contactForm.body}
-                    onChange={e => setContactForm({...contactForm, body: e.target.value})}
-                    placeholder="詳細をご記入ください..."
-                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
-                  />
-                </div>
-                <div className="pt-2 flex gap-3">
-                   <button
-                     type="button"
-                     onClick={() => setContactModalOpen(false)}
-                     className="flex-1 bg-stone-100 text-stone-500 font-bold py-3 rounded-xl hover:bg-stone-200"
-                   >
-                     キャンセル
-                   </button>
-                   <button
-                     type="submit"
-                     disabled={sendingContact}
-                     className="flex-1 bg-[#EEA51A] text-white font-bold py-3 rounded-xl hover:bg-[#D99000] disabled:opacity-50 transition shadow-md"
-                   >
-                     {sendingContact ? '送信中...' : '送信する'}
-                   </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
+      {/* ▼▼▼ スマホ幅コンテンツエリア（中央寄せ） ▼▼▼ */}
+      <div className="relative z-10 w-full max-w-[480px] mx-auto bg-white min-h-screen shadow-2xl flex flex-col font-sans text-[#333]">
+        
+      {/* メインビジュアルエリア */}
+      <div className="w-full">
+        <Link href="/program" className="block w-full">
+           <img 
+             src="/img/bnr_program.jpg" 
+             alt="Program" 
+             className="w-full h-auto object-cover max-w-5xl mx-auto shadow-lg" 
+           />
+        </Link>
       </div>
+
+      {/* Concept Section */}
+        <section className="bg-[#6D6353] text-white text-center py-12 px-6">
+          <h2 className="text-xl font-bold mb-8 tracking-wider">
+            ananda(आनन्दः) とは
+          </h2>
+          <p className="leading-loose text-sm font-medium opacity-90">
+            サンスクリット語で<br />
+            「完全な幸福」という意味です。<br />
+            完全な幸福とは「自分を縛る制限<br />
+            から自由になること」 です。<br />
+            ヨガが、制限だらけの私たちを解放<br />
+            する一助となりますように。
+          </p>
+        </section>
+
+      {/* News Section */}
+        <NewsSection newsList={newsList} />
+
+      {/* About Section */}
+      <section className="relative h-[500px] flex items-center justify-center text-left px-6">
+          <img 
+            src="/img/bg_about.jpg" 
+            className="absolute inset-0 w-full h-full object-cover" 
+            alt="About Background" 
+          />
+        <div className="relative z-10 text-white py-10">
+            <h2 className="text-xl sm:text-2xl font-bold mb-8 leading-relaxed drop-shadow-md">
+              伝統的な古典ハタヨガを通じて<br />幸福に生きられるように
+            </h2>
+            <p className="leading-loose text-sm sm:text-base max-w-2xl mx-auto font-medium drop-shadow-sm">
+              私たちは常に、欠陥だらけの身体や心、<br />
+              そして取り巻く状況からもありとあらゆる<br />
+              制限を受けています。ヨガの瞑想や哲学、<br />
+              呼吸法、アーサナ練習は、制限だらけの<br />
+              自分を解放する術となります。<br />
+              ヨガを通じて一人でも多くの人が自分らしく<br />
+              幸せに生きられるようサポートしていきたい<br />
+              と思います。
+            </p>
+        </div>
+      </section>
+
+{/* Instagram Section */}
+      <section className="py-16 bg-[#F7F5F0] text-center">
+        <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Instagram</h3>
+        <h2 className="text-xl font-bold tracking-widest text-stone-700 mb-6">インスタ</h2>
+        {/* ★変更: リンクを追加し、IDを修正しました */}
+        <a 
+          href="https://www.instagram.com/anandayoga_maebashi/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-stone-500 text-sm font-bold hover:text-[#EEA51A] transition-colors border-b border-stone-300 pb-1"
+        >
+          @anandayoga_maebashi
+        </a>
+      </section>
+
+{/* Class Section */}
+        <section className="py-16 px-6 bg-[#F9F8F6]" id="lessons">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-10">
+              {/* ★変更: font-serif italic を削除し、font-sans (ゴシック) に変更 */}
+              <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Class</h3>
+              <h2 className="text-xl font-bold tracking-widest text-stone-700">クラス</h2>
+            </div>
+            <div className="grid gap-6">
+              {[
+                { title: 'やさしいハタヨガ', desc: '心身のリラックスを目的としたクラスです。あお向け・座位を中心としたやさしいアーサナで深い呼吸を感じながらゆっくりと身体を開いていきます。呼吸法、瞑想法、アーサナを通して心と体の不調を取り去り、本来の自分に気づかせてくれるヨガです。' },
+                { title: 'ハタヨガ', desc: 'ヨガの源流であり、ヨガを続けることで心と体を変えていきたいという方にお勧めのクラスです。身体が固くて不安な方、運動不足を気にされている方、筋力に衰えを感じる方、なんだか最近気分が落ち込み気味な方などなど、ヨガ未経験者の最初の一歩にお勧め。ヨガをした後の心や身体への感覚をお楽しみください。' },
+                { title: '古式太陽礼拝', desc: 'インドで伝統的に行われている方法でスーリヤナマスカーラマントラを唱えながら太陽礼拝を練習します。前屈と後屈を繰り返し、背骨の曲げ伸ばしをすることで全身を深くストレッチします。酸素を全身に送り届け、心身をリラックスさせてくれます。' },
+                { title: '瞑想プラーナヤマ', desc: '心が乱れているとき、呼吸は浅く、リラックスしているときは呼吸はゆっくり深くなります。呼吸と心は繋がっていて、様々な呼吸法を練習することで自分の心を扱う方法を知ることができます。アーサナ（ポーズ）はとらない瞑想クラスです。' },
+                { title: '陰ヨガ', desc: '深い呼吸と共に脱力し、心と体にリラックスをもたらすセラピー要素の強いヨガです。体の深い組織、関節、靭帯、骨、筋膜といった結合組織に長くやさしく働きかけていきます。肉体だけでなく、感情的および精神的変化もあるヨガです。' },
+                { title: 'パワーヨガ', desc: '呼吸と動きを合わせてアーサナがつながっていくレッスンです。力学に基づいた身体の使い方やアライメントを動きのなかで学ぶことができます。体幹を整え、腰痛・肩こりなどを予防する身体的作用と、自律神経の調整・不安の解消・集中力の向上などの精神的な作用が期待できます。続けることで真の心身の健康を得ることができます。' },
+              ].map((item, index) => (
+                <div key={index} className="bg-white p-6 rounded-xl shadow-sm">
+                  <h3 className="font-bold text-lg mb-3 text-stone-800">{item.title}</h3>
+                  <p className="text-sm text-stone-600 leading-relaxed text-justify">
+                    {item.desc}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+{/* Price Section */}
+        <section className="py-20 bg-white" id="price">
+          <div className="max-w-sm mx-auto px-4">
+            <div className="text-center mb-10">
+              {/* ★変更: font-serif italic を削除し、font-sans (ゴシック) に変更 */}
+              <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Price</h3>
+              <h2 className="text-xl font-bold tracking-widest text-stone-700">料金</h2>
+            </div>
+
+            <div className="space-y-10">
+               {/* ドロップイン */}
+               <div>
+                  <div className="text-center mb-4">
+                     <span className="inline-block border border-stone-800 px-8 py-1.5 rounded-full text-sm font-bold">ドロップイン</span>
+                  </div>
+                  <div className="border border-stone-200 p-6 rounded-xl text-center bg-[#FDFBF7]">
+                     <p className="font-bold text-sm mb-1">1回</p>
+                     <p className="text-xl font-bold text-stone-800">¥3,000 <span className="text-[10px] text-stone-500 font-normal">(税込¥3,300)</span></p>
+                  </div>
+               </div>
+
+               {/* 会員コース */}
+               <div>
+                  <div className="text-center mb-4">
+                     <span className="inline-block border border-stone-800 px-8 py-1.5 rounded-full text-sm font-bold">会員コース</span>
+                  </div>
+                  <div className="space-y-3">
+                     <div className="bg-stone-500 text-white p-4 text-center rounded-xl">
+                        <div className="text-xs mb-1 font-medium">月4回コース</div>
+                        <div className="text-lg font-bold tracking-wide">月額 ¥8,800 <span className="text-[10px] font-normal opacity-80">(税込¥9,680)</span></div>
+                     </div>
+                     <div className="bg-stone-500 text-white p-4 text-center rounded-xl">
+                        <div className="text-xs mb-1 font-medium">月5回コース</div>
+                        <div className="text-lg font-bold tracking-wide">月額 ¥9,900 <span className="text-[10px] font-normal opacity-80">(税込¥10,890)</span></div>
+                     </div>
+                     <div className="bg-[#EEA51A] text-white p-4 text-center rounded-xl shadow-md transform scale-105">
+                        <div className="text-xs mb-1 font-bold">通い放題コース</div>
+                        <div className="text-lg font-bold tracking-wide">月額 ¥13,800 <span className="text-[10px] font-normal opacity-80">(税込¥15,180)</span></div>
+                     </div>
+                  </div>
+                  <div className="mt-6 text-[10px] text-stone-500 bg-stone-50 p-4 rounded-xl">
+                    <p className="font-bold mb-1">ご入会時にお持ちいただくもの</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li>クレジットカードもしくはキャッシュカード</li>
+                      <li>月会費2ヶ月分 / 印鑑</li>
+                    </ul>
+                  </div>
+               </div>
+
+               {/* 回数券 */}
+               <div>
+                  <div className="text-center mb-4">
+                     <span className="inline-block border border-stone-800 px-8 py-1.5 rounded-full text-sm font-bold">回数券</span>
+                  </div>
+                  <div className="bg-[#FDFBF7] border border-stone-100 p-5 rounded-xl space-y-4">
+                    <div className="border-b border-stone-200 pb-2 flex justify-between items-baseline">
+                      <span className="text-sm font-bold">3回券</span>
+                      <span className="text-base font-bold">¥7,500 <span className="text-[10px] font-normal text-stone-500">(税込¥8,250)</span></span>
+                    </div>
+                    <div className="border-b border-stone-200 pb-2 flex justify-between items-baseline">
+                      <span className="text-sm font-bold">5回券</span>
+                      <span className="text-base font-bold">¥11,500 <span className="text-[10px] font-normal text-stone-500">(税込¥12,650)</span></span>
+                    </div>
+                    <div className="border-b border-stone-200 pb-2 flex justify-between items-baseline">
+                      <span className="text-sm font-bold">10回券</span>
+                      <span className="text-base font-bold">¥22,000 <span className="text-[10px] font-normal text-stone-500">(税込¥24,200)</span></span>
+                    </div>
+                    <div className="text-right text-[10px] text-stone-400">※有効期限あり</div>
+                  </div>
+               </div>
+               
+               <div className="text-[11px] text-stone-500 bg-stone-50 p-4 rounded-xl leading-relaxed">
+                  <strong>※受講済みチケット15回分で、次回のチケット購入時に1,000円OFFさせていただきます。</strong><br/>
+                  ※有効期限内に使い切れなかった場合は有効期限日から1カ月以内であれば、1回＋1,100円でご参加いただけます。<br/>
+                  ※パーソナルレッスンや特別講座にはご利用いただけません。
+               </div>
+
+               {/* パーソナル */}
+               <div>
+                  <div className="text-center mb-6">
+                    <span className="inline-block border border-stone-800 px-8 py-1 rounded-full text-sm font-bold">パーソナルレッスン (60分)</span>
+                 </div>
+                 <div className="flex justify-between items-center max-w-xs mx-auto border-b border-stone-200 pb-2 mb-6">
+                   <div className="font-bold">1回</div>
+                   <div>¥6,000 <span className="text-xs text-stone-500">(税込¥6,600)</span></div>
+                 </div>
+
+                 <div className="text-center mb-4">
+                    <span className="inline-block border border-stone-800 px-8 py-1 rounded-full text-sm font-bold bg-white">パーソナル会員コース</span>
+                 </div>
+                 <div className="space-y-4 max-w-sm mx-auto mb-8">
+                   <div className="bg-stone-500 text-white text-center py-2 rounded">
+                      <div className="text-sm">月2回コース</div>
+                      <div className="text-sm">月額 ¥11,400 <span className="text-xs opacity-80">(税込¥12,540)</span></div>
+                   </div>
+                   <div className="bg-[#EEA51A] text-white text-center py-2 rounded font-bold shadow-md">
+                      <div className="text-sm">月4回コース</div>
+                      <div className="text-sm">月額 ¥20,000 <span className="text-xs opacity-80">(税込¥22,000)</span></div>
+                   </div>
+                 </div>
+
+                 <div className="max-w-sm mx-auto mb-8">
+                     <div className="text-[10px] text-stone-500 bg-stone-50 p-4 rounded-xl mb-6">
+                          <p className="font-bold mb-2">ご入会時にお持ちいただくもの</p>
+                          <ul className="list-disc pl-4 space-y-1">
+                              <li>クレジットカードもしくはキャッシュカード</li>
+                              <li>月会費2ヶ月分</li>
+                              <li>印鑑</li>
+                          </ul>
+                     </div>
+
+                     <div className="text-xs leading-loose text-stone-600 text-justify">
+                          <p className="mb-4">
+                              身体の状態に合わせてその方だけの最適なシークエンスや練習法を作るプライベートレッスン。
+                              身体の様子を観ながら緊張部位にはストレッチをかけ、弱化部位には筋力を養うアーサナを選び、そのかたに合わせたオーダーメイドのヨガレッスンを提供いたします。
+                          </p>
+                          <p className="mb-4">
+                              「スタジオやジムでヨガをやっているけれど、正しいやり方を知りたい」という方はアライメントを学びながらヨガを進めていきますのでヨガをより深く理解することができます。
+                              初心者の方もインストラクターと相談しながら、その時の体調などに合わせて自由にレッスンメニューを組むことができますので安心してヨガをお楽しみいただけます。
+                          </p>
+                          <p>
+                              ＊ご希望の日時をメールにてお知らせください。レッスン可能か確認後、折り返しご連絡いたします。<br />
+                              〈メールアドレス〉<a href="mailto:info@ananda-yogaschool.com" className="text-[#EEA51A] hover:underline">info@ananda-yogaschool.com</a>
+                          </p>
+                     </div>
+                 </div>
+
+                 <div className="bg-[#FDFBF7] p-4 rounded border border-stone-100 text-xs text-stone-600 max-w-sm mx-auto">
+                    <div className="text-center font-bold mb-2">2名様以上で受講される場合 (お一人あたり)</div>
+                    <dl className="grid grid-cols-2 gap-y-1 pl-4">
+                       <dt>2名様</dt><dd>¥4,000 (税込¥4,400)</dd>
+                       <dt>3名様</dt><dd>¥3,000 (税込¥3,300)</dd>
+                       <dt>4名様</dt><dd>¥2,500 (税込¥2,750)</dd>
+                       <dt>5名様以上</dt><dd>¥2,000 (税込¥2,200)</dd>
+                    </dl>
+                 </div>
+               </div>
+
+            </div>
+          </div>
+        </section>
+        
+      {/* Trial Lesson Section */}
+      <section className="py-20 text-center" id="trial">
+        <div className="section-inner max-w-4xl mx-auto px-4">
+          {/* ★変更: font-serif italic を削除し、font-sans (ゴシック) に変更 */}
+          <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Trial lesson</h3>
+          <h2 className="text-xl font-bold tracking-widest text-stone-700 mb-10">体験レッスンの流れ</h2>
+          
+          <div className="bg-white border-2 border-[#EEA51A] p-8 rounded-none max-w-md mx-auto mb-12 shadow-[4px_4px_0px_0px_rgba(238,165,26,0.2)]">
+            <div className="font-bold text-sm mb-2">初めての方限定</div>
+            <div className="text-2xl font-bold text-[#EEA51A] mb-1">体験レッスン ¥2,200</div>
+            <p className="text-xs text-stone-500 mb-4">グループレッスンを体験いただけます。</p>
+            <div className="border border-stone-300 p-3 text-sm font-bold">
+              体験当日の会員コースご入会で<br />入会金 税込¥3,000 ⇒ ¥0
+            </div>
+          </div>
+
+          <div className="space-y-8 max-w-lg mx-auto text-left relative">
+            <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-stone-200"></div>
+            {[
+              { step: '01', text: 'レッスンスケジュールを見て、受講するレッスンを選びます。初回はオールレベルのクラスがおすすめです。' },
+              { step: '02', text: 'WEBの予約フォームからレッスンを予約します。' },
+              { step: '03', text: '当日は、ヨガのできる動きやすい服装にあらかじめ着替えて、レッスン開始時刻の10分前にお越しください。' },
+              { step: '04', text: 'スタジオに着いたら最初に同意書のご記入、受講料のお支払いをして、レッスンをお楽しみください。' },
+            ].map((item) => (
+              <div key={item.step} className="flex gap-6 relative z-10 bg-white items-start">
+                <div className="text-stone-200 font-bold text-4xl font-serif leading-none flex-shrink-0 bg-white pb-2 pr-2">
+                    <span className="text-sm block text-stone-300 -mb-1">STEP</span>{item.step}
+                </div>
+                <p className="text-sm leading-relaxed pt-2 font-medium text-stone-600">{item.text}</p>
+              </div>
+            ))}
+          </div>
+          
+          <div className="mt-8 text-xs text-stone-500 border border-stone-200 p-2 inline-block">
+             お持ち物 | 水・汗拭き用フェイスタオル<br/>
+             (ヨガマットは無料レンタルがございます)
+          </div>
+        </div>
+      </section>
+
+{/* Access Section */}
+        <section id="access" className="py-20 bg-[#F7F5F0]">
+          <div className="max-w-4xl mx-auto px-4 text-center">
+            {/* ★変更: font-serif italic を削除し、font-sans (ゴシック) に変更 */}
+            <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Access</h3>
+            <h2 className="text-xl font-bold tracking-widest text-stone-700 mb-10">アクセス</h2>
+            
+            {/* MAP */}
+            <div className="bg-white px-8 py-2 rounded-full border border-stone-800 inline-block mb-6 text-sm font-bold tracking-widest">MAP</div>
+            <div className="bg-white p-4 rounded-xl shadow-sm inline-block w-full max-w-2xl mb-12">
+              <div className="aspect-video w-full bg-stone-200 mb-4 rounded overflow-hidden relative">
+                <iframe 
+                  src="https://maps.google.com/maps?q=36.377227,139.056983&output=embed&z=15" 
+                  width="100%" height="100%" style={{border:0}} loading="lazy"
+                  title="Google Map"
+                ></iframe>
+              </div>
+              <div className="text-left flex flex-col md:flex-row items-start gap-4">
+                 <img src="/logo.png" className="w-32 object-contain" alt="Logo"/>
+                 <p className="text-sm leading-relaxed font-bold text-stone-600">
+                    〒371-0831<br />
+                    群馬県前橋市小相木町327 タカゼンビル2階<br />
+                    駐車場　店舗裏に5台あり
+                  </p>
+              </div>
+            </div>
+
+            {/* 駐車場 */}
+            <div className="bg-white px-8 py-2 rounded-full border border-stone-800 inline-block mb-6 text-sm font-bold tracking-widest">駐車場</div>
+            <div className="bg-white p-6 max-w-xs mx-auto shadow-sm mb-12">
+               <img src="/img/parking.png" className="w-full h-auto mb-2" alt="Parking"/>
+               <p className="text-xs font-bold text-stone-600"><span className="text-[#EEA51A]">■</span>の駐車場（10番～14番）をご利用いただけます。</p>
+            </div>
+
+            {/* 経路案内 */}
+            <div className="bg-white px-8 py-2 rounded-full border border-stone-800 inline-block mb-10 text-sm font-bold tracking-widest">経路案内</div>
+            
+            {/* 建物外観 */}
+            <div className="w-full max-w-md mx-auto mb-12">
+               <img src="/img/access_guide_top.jpg" alt="外観" className="w-full h-auto rounded-lg shadow-sm" />
+            </div>
+
+            {/* ステップ案内 */}
+            <div className="max-w-xs mx-auto space-y-12">
+               {[
+                 { num: '01', text: 'こちらの窓の部屋が\nスタジオです', img: '/img/access_step1.jpg' },
+                 { num: '02', text: 'こちらの入口から中に入って、\n階段で2階に上がります', img: '/img/access_step2.jpg' },
+                 { num: '03', text: '2階のこちらのドアが\nスタジオ入口です', img: '/img/access_step3.jpg' },
+                 { num: '04', text: 'マットを敷いて\nヨガを始めましょう', img: '/img/access_step4.jpg' },
+               ].map((step, i) => (
+                 <div key={i} className="relative pt-8">
+                    {/* 吹き出し部分 */}
+                    <div className="absolute top-0 left-0 right-0 z-10">
+                       <div className="bg-white rounded-xl py-3 px-4 shadow-md flex items-center gap-3 w-[90%] mx-auto relative">
+                          <span className="text-xl font-mono text-stone-800 font-medium">{step.num}</span>
+                          <p className="text-[10px] font-bold text-stone-700 text-left leading-relaxed whitespace-pre-wrap flex-1">
+                             {step.text}
+                          </p>
+                          {/* 吹き出しの三角 */}
+                          <div className="absolute bottom-[-8px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white"></div>
+                       </div>
+                    </div>
+                    
+                    {/* 画像部分 */}
+                    <div className="rounded-2xl overflow-hidden shadow-sm border-4 border-white mt-4 bg-stone-200 aspect-[4/3]">
+                       <img 
+                         src={step.img} 
+                         alt={`Step ${step.num}`}
+                         className="w-full h-full object-cover"
+                       />
+                    </div>
+                 </div>
+               ))}
+            </div>
+
+          </div>
+        </section>
+
+{/* Instructor Section */}
+        <section className="py-20 bg-white">
+          <div className="text-center px-4 max-w-md mx-auto">
+            {/* ヘッダー */}
+            {/* こちらは元々 font-sans でしたが、他のh3とスタイルを統一 */}
+            <h3 className="text-[#EEA51A] font-bold text-xl mb-1 font-sans tracking-wide">Instructor</h3>
+            <h2 className="text-xs font-bold tracking-[0.3em] text-stone-800 mb-10">講師</h2>
+            
+            {/* 1. プロフィール写真 */}
+            <div className="mb-8">
+               <img src="/img/instructor01.jpg" alt="小林哲朗" className="w-full h-auto object-cover" />
+            </div>
+
+            {/* 2. 名前 */}
+            <div className="mb-4 text-[#0F2849]">
+               <h3 className="font-bold text-lg tracking-widest inline-block mr-3">小林哲朗</h3>
+               <span className="font-bold text-xs tracking-widest font-sans">TETSURO KOBAYASHI</span>
+            </div>
+
+            {/* 3. バッジ (RYTロゴの再現) */}
+            <div className="flex justify-center gap-4 mb-6">
+               <div className="w-14 h-14 rounded-full border-[2px] border-[#D16B53] flex flex-col items-center justify-center text-[#D16B53] leading-none">
+                  <span className="text-[8px] font-bold mb-0.5">RYT</span>
+                  <span className="text-xs font-bold">200</span>
+               </div>
+               <div className="w-14 h-14 rounded-full border-[2px] border-[#D16B53] flex flex-col items-center justify-center text-[#D16B53] leading-none">
+                  <span className="text-[8px] font-bold mb-0.5">E-RYT</span>
+                  <span className="text-xs font-bold">500</span>
+               </div>
+            </div>
+
+            {/* 4. 資格リスト */}
+            <div className="inline-block text-left text-xs font-bold text-stone-700 leading-relaxed mb-10 tracking-wide">
+               <p>・全米ヨガアライアンスRYT500</p>
+               <p>・古典ハタヨガ浄化法講師</p>
+               <p>・瞑想講師</p>
+               <p>・ヨガ指導歴12年</p>
+            </div>
+
+            {/* 5. クラス風景写真 */}
+            <div className="mb-6">
+               <img src="/img/instructor02.jpg" alt="Lesson" className="w-full h-auto object-cover" />
+            </div>
+
+            {/* 6. 紹介文 (前半) */}
+            <div className="text-left text-xs leading-loose text-stone-800 font-medium mb-10 text-justify tracking-wider">
+               <p>
+                 フィリピン駐在中にPascale Wettsteinより師事を受け、身体の力学を重視したアジャストやプロップスの使い方、シークエンスの作り方を学びました。後にインドへ行き、哲学や瞑想、ヨガの解剖学、アーユルヴェーダの生理学について学び、二大古典ヨガであるハタヨガとアシュタンガヨガを日々実践。瞑想や哲学、解剖学の知識に基づく体と心に届くレッスンを提供しています。
+               </p>
+            </div>
+
+            {/* 7. 指導風景写真 */}
+            <div className="mb-10">
+               <img src="/img/instructor03.jpg" alt="Teaching" className="w-full h-auto object-cover" />
+            </div>
+
+{/* 8. 紹介文 (後半・ヒストリー) */}
+            {/* デザインに合わせて背景画像を追加し、文字を白にしました */}
+            <div className="relative w-full rounded-xl overflow-hidden shadow-sm">
+               {/* 背景画像 (暗くするフィルタを適用して文字を見やすく) */}
+               <div className="absolute inset-0">
+                  <img 
+                    src="/img/bg-history.jpg"  // ★この画像を public/img フォルダに追加してください
+                    alt="Background" 
+                    className="w-full h-full object-cover" 
+                  />
+               </div>
+
+               {/* テキストコンテンツ */}
+               <div className="relative z-10 p-8 text-left space-y-6 text-xs leading-loose text-white font-medium text-justify tracking-wide">
+                   <p>
+                     私自身、ヨガを始める前は顎関節症に伴う慢性頭痛と不眠の症状に悩まされていました。フィリピン駐在中に現地のヨガスタジオで初めてヨガをした後、それまでズーンと頭に常にあった痛みがスッキリとれ今までにないほど視界がクリアになりました。自分にはヨガが合っていると思い日々ヨガに打ち込むように。
+                   </p>
+                   <p>
+                     そこでPascale Wettsteinより師事を受け、身体の力学に基づいたヨガを学びました。その後、インドへ行き、インドの先生方からアーサナ、呼吸法、瞑想法を通して身体の不調を取り去るインド古来の叡智を学び、哲学を通して物事を見る視点や考え方を学びました。
+                   </p>
+                   <p>
+                     持病に回帰性リウマチがあり痛みで身体が自由に動かない日もありますが、痛いからこそわかる、不調を抱える人に寄り添ったヨガを心がけています。身体に痛みがある場合は道具を使って軽減したりアーサナの形をその方に合ったものに変更したりすることで、無理なくヨガの効果の恩恵を受けられます。年齢を重ねるにつれて現れる身体の不調や可動域の変化をヨガを続けることで少しずつ改善していきましょう。
+                   </p>
+               </div>
+            </div>
+
+          </div>
+        </section>
+
+      {/* Schedule Section */}
+        <ScheduleSection schedules={schedules} />
+    </div>
     </div>
   );
 }
