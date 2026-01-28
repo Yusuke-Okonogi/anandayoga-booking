@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import NewsSection, { News } from './components/NewsSection';
-import ScheduleSection from './components/ScheduleSection';
+import NewsSection, { News } from '../components/NewsSection';
+import ScheduleSection from '../components/ScheduleSection';
 
 // microCMSからニュースを取得する関数
 async function getNews() {
@@ -110,7 +110,6 @@ export default async function HomePage() {
       <section className="py-16 bg-[#F7F5F0] text-center">
         <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Instagram</h3>
         <h2 className="text-xl font-bold tracking-widest text-stone-700 mb-6">インスタ</h2>
-        {/* ★変更: リンクを追加し、IDを修正しました */}
         <a 
           href="https://www.instagram.com/anandayoga_maebashi/" 
           target="_blank" 
@@ -125,7 +124,6 @@ export default async function HomePage() {
         <section className="py-16 px-6 bg-[#F9F8F6]" id="lessons">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-10">
-              {/* ★変更: font-serif italic を削除し、font-sans (ゴシック) に変更 */}
               <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Class</h3>
               <h2 className="text-xl font-bold tracking-widest text-stone-700">クラス</h2>
             </div>
@@ -153,7 +151,6 @@ export default async function HomePage() {
         <section className="py-20 bg-white" id="price">
           <div className="max-w-sm mx-auto px-4">
             <div className="text-center mb-10">
-              {/* ★変更: font-serif italic を削除し、font-sans (ゴシック) に変更 */}
               <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Price</h3>
               <h2 className="text-xl font-bold tracking-widest text-stone-700">料金</h2>
             </div>
@@ -166,7 +163,7 @@ export default async function HomePage() {
                   </div>
                   <div className="border border-stone-200 p-6 rounded-xl text-center bg-[#FDFBF7]">
                      <p className="font-bold text-sm mb-1">1回</p>
-                     <p className="text-xl font-bold text-stone-800">¥3,000 <span className="text-[10px] text-stone-500 font-normal">(税込¥3,300)</span></p>
+                     <p className="text-xl font-bold text-stone-800">¥3,000 <span className="text-xs text-stone-500 font-normal">(税込¥3,300)</span></p>
                   </div>
                </div>
 
@@ -178,18 +175,18 @@ export default async function HomePage() {
                   <div className="space-y-3">
                      <div className="bg-stone-500 text-white p-4 text-center rounded-xl">
                         <div className="text-xs mb-1 font-medium">月4回コース</div>
-                        <div className="text-lg font-bold tracking-wide">月額 ¥8,800 <span className="text-[10px] font-normal opacity-80">(税込¥9,680)</span></div>
+                        <div className="text-lg font-bold tracking-wide">月額 ¥8,800 <span className="text-xs font-normal opacity-80">(税込¥9,680)</span></div>
                      </div>
                      <div className="bg-stone-500 text-white p-4 text-center rounded-xl">
                         <div className="text-xs mb-1 font-medium">月5回コース</div>
-                        <div className="text-lg font-bold tracking-wide">月額 ¥9,900 <span className="text-[10px] font-normal opacity-80">(税込¥10,890)</span></div>
+                        <div className="text-lg font-bold tracking-wide">月額 ¥9,900 <span className="text-xs font-normal opacity-80">(税込¥10,890)</span></div>
                      </div>
                      <div className="bg-[#EEA51A] text-white p-4 text-center rounded-xl shadow-md transform scale-105">
                         <div className="text-xs mb-1 font-bold">通い放題コース</div>
-                        <div className="text-lg font-bold tracking-wide">月額 ¥13,800 <span className="text-[10px] font-normal opacity-80">(税込¥15,180)</span></div>
+                        <div className="text-lg font-bold tracking-wide">月額 ¥13,800 <span className="text-xs font-normal opacity-80">(税込¥15,180)</span></div>
                      </div>
                   </div>
-                  <div className="mt-6 text-[10px] text-stone-500 bg-stone-50 p-4 rounded-xl">
+                  <div className="mt-6 text-xs text-stone-500 bg-stone-50 p-4 rounded-xl">
                     <p className="font-bold mb-1">ご入会時にお持ちいただくもの</p>
                     <ul className="list-disc pl-4 space-y-1">
                       <li>クレジットカードもしくはキャッシュカード</li>
@@ -206,21 +203,21 @@ export default async function HomePage() {
                   <div className="bg-[#FDFBF7] border border-stone-100 p-5 rounded-xl space-y-4">
                     <div className="border-b border-stone-200 pb-2 flex justify-between items-baseline">
                       <span className="text-sm font-bold">3回券</span>
-                      <span className="text-base font-bold">¥7,500 <span className="text-[10px] font-normal text-stone-500">(税込¥8,250)</span></span>
+                      <span className="text-base font-bold">¥7,500 <span className="text-xs font-normal text-stone-500">(税込¥8,250)</span></span>
                     </div>
                     <div className="border-b border-stone-200 pb-2 flex justify-between items-baseline">
                       <span className="text-sm font-bold">5回券</span>
-                      <span className="text-base font-bold">¥11,500 <span className="text-[10px] font-normal text-stone-500">(税込¥12,650)</span></span>
+                      <span className="text-base font-bold">¥11,500 <span className="text-xs font-normal text-stone-500">(税込¥12,650)</span></span>
                     </div>
                     <div className="border-b border-stone-200 pb-2 flex justify-between items-baseline">
                       <span className="text-sm font-bold">10回券</span>
-                      <span className="text-base font-bold">¥22,000 <span className="text-[10px] font-normal text-stone-500">(税込¥24,200)</span></span>
+                      <span className="text-base font-bold">¥22,000 <span className="text-xs font-normal text-stone-500">(税込¥24,200)</span></span>
                     </div>
-                    <div className="text-right text-[10px] text-stone-400">※有効期限あり</div>
+                    <div className="text-right text-xs text-stone-400">※有効期限あり</div>
                   </div>
                </div>
                
-               <div className="text-[11px] text-stone-500 bg-stone-50 p-4 rounded-xl leading-relaxed">
+               <div className="text-xs text-stone-500 bg-stone-50 p-4 rounded-xl leading-relaxed">
                   <strong>※受講済みチケット15回分で、次回のチケット購入時に1,000円OFFさせていただきます。</strong><br/>
                   ※有効期限内に使い切れなかった場合は有効期限日から1カ月以内であれば、1回＋1,100円でご参加いただけます。<br/>
                   ※パーソナルレッスンや特別講座にはご利用いただけません。
@@ -251,7 +248,7 @@ export default async function HomePage() {
                  </div>
 
                  <div className="max-w-sm mx-auto mb-8">
-                     <div className="text-[10px] text-stone-500 bg-stone-50 p-4 rounded-xl mb-6">
+                     <div className="text-xs text-stone-500 bg-stone-50 p-4 rounded-xl mb-6">
                           <p className="font-bold mb-2">ご入会時にお持ちいただくもの</p>
                           <ul className="list-disc pl-4 space-y-1">
                               <li>クレジットカードもしくはキャッシュカード</li>
@@ -294,7 +291,6 @@ export default async function HomePage() {
       {/* Trial Lesson Section */}
       <section className="py-20 text-center" id="trial">
         <div className="section-inner max-w-4xl mx-auto px-4">
-          {/* ★変更: font-serif italic を削除し、font-sans (ゴシック) に変更 */}
           <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Trial lesson</h3>
           <h2 className="text-xl font-bold tracking-widest text-stone-700 mb-10">体験レッスンの流れ</h2>
           
@@ -325,8 +321,8 @@ export default async function HomePage() {
           </div>
           
           <div className="mt-8 text-xs text-stone-500 border border-stone-200 p-2 inline-block">
-             お持ち物 | 水・汗拭き用フェイスタオル<br/>
-             (ヨガマットは無料レンタルがございます)
+              お持ち物 | 水・汗拭き用フェイスタオル<br/>
+              (ヨガマットは無料レンタルがございます)
           </div>
         </div>
       </section>
@@ -334,7 +330,6 @@ export default async function HomePage() {
 {/* Access Section */}
         <section id="access" className="py-20 bg-[#F7F5F0]">
           <div className="max-w-4xl mx-auto px-4 text-center">
-            {/* ★変更: font-serif italic を削除し、font-sans (ゴシック) に変更 */}
             <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Access</h3>
             <h2 className="text-xl font-bold tracking-widest text-stone-700 mb-10">アクセス</h2>
             
@@ -348,9 +343,9 @@ export default async function HomePage() {
                   title="Google Map"
                 ></iframe>
               </div>
-              <div className="text-left flex flex-col md:flex-row items-start gap-4">
-                 <img src="/logo.png" className="w-32 object-contain" alt="Logo"/>
-                 <p className="text-sm leading-relaxed font-bold text-stone-600">
+              <div className="text-left flex flex-col items-start gap-4">
+                  <img src="/logo.png" className="w-32 object-contain" alt="Logo"/>
+                  <p className="text-sm leading-relaxed font-bold text-stone-600">
                     〒371-0831<br />
                     群馬県前橋市小相木町327 タカゼンビル2階<br />
                     駐車場　店舗裏に5台あり
@@ -382,26 +377,26 @@ export default async function HomePage() {
                  { num: '04', text: 'マットを敷いて\nヨガを始めましょう', img: '/img/access_step4.jpg' },
                ].map((step, i) => (
                  <div key={i} className="relative pt-8">
-                    {/* 吹き出し部分 */}
-                    <div className="absolute top-0 left-0 right-0 z-10">
-                       <div className="bg-white rounded-xl py-3 px-4 shadow-md flex items-center gap-3 w-[90%] mx-auto relative">
-                          <span className="text-xl font-mono text-stone-800 font-medium">{step.num}</span>
-                          <p className="text-[10px] font-bold text-stone-700 text-left leading-relaxed whitespace-pre-wrap flex-1">
-                             {step.text}
-                          </p>
-                          {/* 吹き出しの三角 */}
-                          <div className="absolute bottom-[-8px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white"></div>
-                       </div>
-                    </div>
-                    
-                    {/* 画像部分 */}
-                    <div className="rounded-2xl overflow-hidden shadow-sm border-4 border-white mt-4 bg-stone-200 aspect-[4/3]">
-                       <img 
-                         src={step.img} 
-                         alt={`Step ${step.num}`}
-                         className="w-full h-full object-cover"
-                       />
-                    </div>
+                   {/* 吹き出し部分 */}
+                   <div className="absolute top-0 left-0 right-0 z-10">
+                      <div className="bg-white rounded-xl py-3 px-4 shadow-md flex items-center gap-3 w-[90%] mx-auto relative">
+                         <span className="text-xl font-mono text-stone-800 font-medium">{step.num}</span>
+                         <p className="text-xs font-bold text-stone-700 text-left leading-relaxed whitespace-pre-wrap flex-1">
+                            {step.text}
+                         </p>
+                         {/* 吹き出しの三角 */}
+                         <div className="absolute bottom-[-8px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white"></div>
+                      </div>
+                   </div>
+                   
+                   {/* 画像部分 */}
+                   <div className="rounded-2xl overflow-hidden shadow-sm border-4 border-white mt-4 bg-stone-200 aspect-[4/3]">
+                      <img 
+                        src={step.img} 
+                        alt={`Step ${step.num}`}
+                        className="w-full h-full object-cover"
+                      />
+                   </div>
                  </div>
                ))}
             </div>
@@ -412,40 +407,82 @@ export default async function HomePage() {
 {/* Instructor Section */}
         <section className="py-20 bg-white">
           <div className="text-center px-4 max-w-md mx-auto">
-            {/* ヘッダー */}
-            {/* こちらは元々 font-sans でしたが、他のh3とスタイルを統一 */}
-            <h3 className="text-[#EEA51A] font-bold text-xl mb-1 font-sans tracking-wide">Instructor</h3>
-            <h2 className="text-xs font-bold tracking-[0.3em] text-stone-800 mb-10">講師</h2>
+
+            <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Instructor</h3>
+            <h2 className="text-xl font-bold tracking-widest text-stone-800 mb-10">講師</h2>
             
             {/* 1. プロフィール写真 */}
-            <div className="mb-8">
-               <img src="/img/instructor01.jpg" alt="小林哲朗" className="w-full h-auto object-cover" />
+            {/* 修正: 角丸(rounded-2xl)と影(shadow-lg)を追加してリッチな印象に */}
+            <div className="mb-8 max-w-[320px] mx-auto">
+               <img 
+                 src="/img/instructor01.jpg" 
+                 alt="小林哲朗" 
+                 className="w-full h-auto object-cover rounded-2xl shadow-lg" 
+               />
             </div>
 
             {/* 2. 名前 */}
-            <div className="mb-4 text-[#0F2849]">
-               <h3 className="font-bold text-lg tracking-widest inline-block mr-3">小林哲朗</h3>
-               <span className="font-bold text-xs tracking-widest font-sans">TETSURO KOBAYASHI</span>
-            </div>
-
-            {/* 3. バッジ (RYTロゴの再現) */}
-            <div className="flex justify-center gap-4 mb-6">
-               <div className="w-14 h-14 rounded-full border-[2px] border-[#D16B53] flex flex-col items-center justify-center text-[#D16B53] leading-none">
-                  <span className="text-[8px] font-bold mb-0.5">RYT</span>
-                  <span className="text-xs font-bold">200</span>
-               </div>
-               <div className="w-14 h-14 rounded-full border-[2px] border-[#D16B53] flex flex-col items-center justify-center text-[#D16B53] leading-none">
-                  <span className="text-[8px] font-bold mb-0.5">E-RYT</span>
-                  <span className="text-xs font-bold">500</span>
+            {/* 修正: レイアウトとフォントサイズを微調整 */}
+            <div className="mb-6 text-[#0F2849]">
+               <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+                 <h3 className="font-bold text-2xl tracking-widest">小林哲朗</h3>
+                 <span className="font-bold text-xs tracking-[0.2em] font-sans mt-1 text-stone-500 sm:text-[#0F2849]">TETSURO KOBAYASHI</span>
                </div>
             </div>
 
-            {/* 4. 資格リスト */}
-            <div className="inline-block text-left text-xs font-bold text-stone-700 leading-relaxed mb-10 tracking-wide">
-               <p>・全米ヨガアライアンスRYT500</p>
-               <p>・古典ハタヨガ浄化法講師</p>
-               <p>・瞑想講師</p>
-               <p>・ヨガ指導歴12年</p>
+            {/* 3. バッジ (画像に変更) */}
+            {/* 修正: CSSでの円形描画を廃止し、imgタグに変更しました */}
+            <div className="flex justify-center gap-3 mb-10">
+               <div className="w-25 h-25">
+                  <img 
+                    src="/img/ryt200.png" // ★アテの画像パス (RYT200)
+                    alt="RYT200"
+                    className="w-full h-full object-contain drop-shadow-sm"
+                  />
+               </div>
+               <div className="w-25 h-25">
+                  <img 
+                    src="/img/e-ryt500.png" // ★アテの画像パス (E-RYT500)
+                    alt="E-RYT500"
+                    className="w-full h-full object-contain drop-shadow-sm"
+                  />
+               </div>
+            </div>
+
+{/* 4. 資格リスト */}
+            {/* 修正: 枠線とラベルを追加し、チェックマークを使ってより目立たせました */}
+            <div className="relative inline-block text-left bg-white px-10 py-8 rounded-2xl shadow-[0_4px_20px_-4px_rgba(238,165,26,0.15)] mb-12 border-2 border-[#EEA51A]/20 mt-4">
+               {/* 上部のラベル */}
+               <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#EEA51A] text-white text-[10px] font-bold px-4 py-1 rounded-full tracking-widest shadow-sm border-2 border-white">
+                 QUALIFICATION
+               </div>
+               
+               <ul className="space-y-3 text-sm font-bold text-stone-700 tracking-wide leading-relaxed">
+                  <li className="flex items-center gap-2.5">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#FFF8E1] text-[#EEA51A] text-xs">
+                      ✓
+                    </span>
+                    全米ヨガアライアンスRYT500
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#FFF8E1] text-[#EEA51A] text-xs">
+                      ✓
+                    </span>
+                    古典ハタヨガ浄化法講師
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#FFF8E1] text-[#EEA51A] text-xs">
+                      ✓
+                    </span>
+                    瞑想講師
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#FFF8E1] text-[#EEA51A] text-xs">
+                      ✓
+                    </span>
+                    ヨガ指導歴12年
+                  </li>
+               </ul>
             </div>
 
             {/* 5. クラス風景写真 */}
@@ -495,7 +532,15 @@ export default async function HomePage() {
         </section>
 
       {/* Schedule Section */}
-        <ScheduleSection schedules={schedules} />
+      <section className="py-16 bg-[#F7F5F0]" id="schedule">
+        <div className="max-w-5xl mx-auto px-4">
+          <div className="text-center mb-10">
+            <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Schedule</h3>
+            <h2 className="text-xl font-bold tracking-widest text-stone-700">スケジュール</h2>
+          </div>
+          <ScheduleSection schedules={schedules} />
+        </div>
+      </section>
     </div>
     </div>
   );

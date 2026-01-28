@@ -3,6 +3,40 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import NewsSection, { News } from '../components/NewsSection';
+import ScheduleSection from '../components/ScheduleSection';
+// microCMSからニュースを取得する関数
+async function getNews() {
+  const apiKey = process.env.MICROCMS_API_KEY;
+  if (!apiKey) return [];
+
+  try {
+    const res = await fetch('https://ananda.microcms.io/api/v1/news?limit=4', {
+      headers: { 'X-MICROCMS-API-KEY': apiKey },
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) throw new Error('Failed to fetch news');
+    const data = await res.json();
+    return data.contents as News[];
+  } catch (error) {
+    console.error('Error fetching news:', error);
+    return [];
+  }
+}
+// microCMSからスケジュールを取得する関数 (クライアント用)
+async function getSchedules() {
+  try {
+    // 自分のサーバーのAPIルートを叩く (APIキーは不要)
+    const res = await fetch('/api/schedules');
+    
+    if (!res.ok) throw new Error('Failed to fetch schedules');
+    const data = await res.json();
+    return data.contents as News[];
+  } catch (error) {
+    console.error('Error fetching schedules:', error);
+    return [];
+  }
+}
 import Link from 'next/link';
 import { 
   format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, 
@@ -28,6 +62,7 @@ type ViewMode = 'day' | 'week' | 'month';
 export default function Home() {
   const router = useRouter();
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [schedules, setSchedules] = useState<News[]>([]);
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +70,7 @@ export default function Home() {
   const [reservingId, setReservingId] = useState<string | null>(null);
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [now, setNow] = useState(new Date());
 
   // モーダル用state
@@ -71,7 +106,14 @@ export default function Home() {
       }
       setLoading(false);
     };
+      const fetchContent = async () => {
+      const scheduleData = await getSchedules();
+      setSchedules(scheduleData);
+    };
+
+
     fetchUser();
+    fetchContent();
   }, []);
 
   const fetchLessons = useCallback(async () => {
@@ -494,16 +536,16 @@ ${visitorForm.notes}
         <div className="px-4 sm:px-0">
           
           {/* 予約に関する注意書き（簡略化版） */}
-          <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-200 mb-6 text-center text-xs text-stone-500 leading-relaxed">
+          <div className="bg-white p-3 rounded-xl shadow-sm border border-stone-200 mt-6 mb-6 text-center text-xs text-stone-500 leading-relaxed">
             <span className="text-[#EEA51A] mr-1">ℹ️</span>
             予約・キャンセルは<span className="font-bold text-stone-600">開始1時間前</span>まで
             <span className="mx-2 text-stone-300 hidden sm:inline">|</span>
             <br className="sm:hidden" />
             パーソナルは<span className="font-bold text-stone-600">前日</span>まで
           </div>
-          
+          <ScheduleSection schedules={schedules} isCompact />
           {/* コントロールバー */}
-          <div className="flex flex-col gap-4 mb-6">
+          <div className="flex flex-col gap-4 mt-6 mb-6">
             <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
               <div className="flex gap-2">
                   <button onClick={handlePrev} className="w-8 h-8 flex items-center justify-center hover:bg-stone-100 rounded-full text-stone-500">←</button>

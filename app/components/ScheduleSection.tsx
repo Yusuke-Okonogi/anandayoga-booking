@@ -16,9 +16,11 @@ export type News = {
 
 type Props = {
   schedules: News[];
+  // ★追加: コンパクト表示フラグ（省略可能、デフォルトはfalse）
+  isCompact?: boolean;
 };
 
-export default function ScheduleSection({ schedules }: Props) {
+export default function ScheduleSection({ schedules, isCompact = false }: Props) {
   const [selectedSchedule, setSelectedSchedule] = useState<News | null>(null);
 
   const openModal = (news: News) => {
@@ -32,26 +34,22 @@ export default function ScheduleSection({ schedules }: Props) {
   };
 
   return (
-    <section className="py-16 text-center">
-      <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-serif italic">Schedule</h3>
-      <h2 className="text-xl font-bold tracking-widest text-stone-700 mb-8">スケジュール</h2>
-      
-      <div className="max-w-md mx-auto px-4">
+    <div className="w-full">      
+      {/* ★修正: isCompactがtrueなら幅制限を解除、falseなら従来のmax-w-md */}
+      <div className={isCompact ? "w-full" : "max-w-md mx-auto"}>
         {schedules.length === 0 ? (
-          <div className="py-10 bg-stone-50 text-stone-400 text-xs rounded-xl border border-stone-100">
+          <div className="py-10 bg-stone-50 text-stone-400 text-xs rounded-xl border border-stone-100 text-center">
             現在公開されているスケジュールはありません
           </div>
         ) : (
-          <div className="space-y-8">
+          /* ★修正: 表示モードによるクラス切り替え */
+          <div className={isCompact ? "grid grid-cols-2 gap-3" : "space-y-8"}>
             {schedules.map((item) => (
               <div 
                 key={item.id}
                 onClick={() => openModal(item)}
                 className="group cursor-pointer inline-block w-full"
               >
-                {/* 修正: アスペクト比固定(aspect-[3/4])を廃止し、
-                   画像そのものの比率(h-auto)で表示して見切れを防ぐ
-                */}
                 <div className="w-full bg-stone-100 border border-stone-200 rounded-xl overflow-hidden relative shadow-sm hover:shadow-md transition">
                   {item.thumbnail ? (
                     <img 
@@ -60,18 +58,19 @@ export default function ScheduleSection({ schedules }: Props) {
                       className="w-full h-auto block" 
                     />
                   ) : (
-                    <div className="aspect-video w-full flex items-center justify-center text-stone-400">
+                    <div className="aspect-square w-full flex items-center justify-center text-stone-400 text-[10px]">
                       No Image
                     </div>
                   )}
-                  {/* ホバー時のヒント */}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition flex items-center justify-center">
-                     <span className="bg-white/90 text-stone-600 text-xs px-4 py-2 rounded-full opacity-0 group-hover:opacity-100 transition transform translate-y-2 group-hover:translate-y-0 shadow-sm font-bold">
-                       タップして拡大
-                     </span>
-                  </div>
+                  {/* ホバー時のヒント（コンパクト時は非表示にするか調整） */}
+                  {!isCompact && (
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition flex items-center justify-center">
+                        <span className="bg-white/90 text-stone-600 text-xs px-4 py-2 rounded-full opacity-0 group-hover:opacity-100 transition transform translate-y-2 group-hover:translate-y-0 shadow-sm font-bold">
+                          タップして拡大
+                        </span>
+                    </div>
+                  )}
                 </div>
-                {/* 修正: タイトルテキストを削除しました */}
               </div>
             ))}
           </div>
@@ -89,7 +88,7 @@ export default function ScheduleSection({ schedules }: Props) {
               className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* ヘッダーエリア (閉じるボタン配置用) */}
+              {/* ヘッダーエリア */}
               <div className="h-12 bg-stone-100 border-b border-stone-200 flex items-center justify-end px-2 shrink-0">
                 <button 
                   onClick={closeModal}
@@ -112,13 +111,12 @@ export default function ScheduleSection({ schedules }: Props) {
                   <div className="py-20 text-center text-stone-400">画像がありません</div>
                 )}
                 
-                {/* 本文がある場合のみ表示 (タイトルは表示しません) */}
                 {selectedSchedule.content && (
                   <div className="p-4 border-t border-stone-100">
-                     <div 
+                      <div 
                         className="prose prose-stone prose-sm max-w-none text-xs leading-loose text-stone-600"
                         dangerouslySetInnerHTML={{ __html: selectedSchedule.content }}
-                     />
+                      />
                   </div>
                 )}
               </div>
@@ -126,6 +124,6 @@ export default function ScheduleSection({ schedules }: Props) {
           </div>
         </ModalPortal>
       )}
-    </section>
+    </div>
   );
 }
