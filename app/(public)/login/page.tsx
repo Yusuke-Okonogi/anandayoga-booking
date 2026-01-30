@@ -35,14 +35,14 @@ export default function LoginPage() {
 
     try {
       if (mode === 'login') {
-        // --- ログイン ---
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        router.push('/booking');
-        router.refresh();
+
+        window.location.href = '/booking'; 
+        return; // 以降の処理を中断
 
       } else if (mode === 'signup') {
         // --- 新規登録 ---
@@ -69,12 +69,22 @@ export default function LoginPage() {
         setMessage('パスワード設定メールを送信しました。\nメール内のリンクから設定を行ってください。');
       }
     } catch (error: any) {
-      if (mode === 'signup' && error.message.includes('already registered')) {
-        setMessage('このメールアドレスは既にビジターとして登録されています。「パスワード設定」からアカウントを有効化してください。');
-        setMode('reset');
+      // ★ ここでエラーメッセージを日本語に変換します
+      let errorMessage = error.message;
+
+      if (errorMessage.includes('Invalid login credentials')) {
+        errorMessage = 'メールアドレスまたはパスワードが正しくありません。';
+      } else if (errorMessage.includes('already registered')) {
+        errorMessage = 'このメールアドレスは既に登録されています。';
+      } else if (errorMessage.includes('Email not confirmed')) {
+        errorMessage = 'メールアドレスの確認が完了していません。';
+      } else if (errorMessage.includes('User not found')) {
+        errorMessage = 'ユーザーが見つかりませんでした。';
       } else {
-        setMessage(`エラー: ${error.message}`);
+        errorMessage = `エラー: ${error.message}`;
       }
+
+      setMessage(errorMessage);
     } finally {
       setLoading(false);
     }

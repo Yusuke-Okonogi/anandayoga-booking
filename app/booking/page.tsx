@@ -531,7 +531,7 @@ ${visitorForm.notes}
 
   return (
     <div className="min-h-screen bg-[#F7F5F0] pb-20 font-sans text-stone-700 sm:p-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto md:pl-[300px] ">
         {/* コンテンツエリア */}
         <div className="px-4 sm:px-0">
           

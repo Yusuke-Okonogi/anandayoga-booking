@@ -2,8 +2,8 @@ import Link from 'next/link';
 
 export default function ProgramPage() {
   return (
-    <div className="min-h-screen w-full bg-[#F0EBE0] text-stone-800 font-sans">
-
+    <div className="min-h-screen w-full bg-[#333] relative bg-[url('/img/bg_main.jpg')] bg-fixed bg-center bg-cover">
+    <div className="relative z-10 w-full max-w-[480px] mx-auto bg-white min-h-screen shadow-2xl flex flex-col font-sans text-stone-800">
       <main className="pb-24">
         {/* ▼▼▼ FV / Title Section (修正：左右パディング追加) ▼▼▼ */}
         <section className="bg-[#F0EBE0] pt-12 pb-16">
@@ -264,7 +264,7 @@ export default function ProgramPage() {
         </section>
 
       </main>
-
+    </div>
     </div>
   );
 }

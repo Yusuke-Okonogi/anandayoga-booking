@@ -76,7 +76,7 @@ export default function NewsSection({ newsList }: Props) {
                    onClick={() => openModal(news)}
                    className="w-full h-full bg-white p-3 rounded-xl shadow-sm border border-stone-100 hover:shadow-md transition cursor-pointer flex flex-col"
                  >
-                    <div className="h-40 bg-stone-50 mb-3 rounded-lg overflow-hidden relative flex items-center justify-center">
+                    <div className="aspect-square bg-stone-50 mb-3 rounded-lg overflow-hidden relative flex items-center justify-center">
                       {news.thumbnail ? (
                         <img 
                           src={news.thumbnail.url} 

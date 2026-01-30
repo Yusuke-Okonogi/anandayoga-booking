@@ -2,6 +2,34 @@ import Link from 'next/link';
 import NewsSection, { News } from '../components/NewsSection';
 import ScheduleSection from '../components/ScheduleSection';
 
+// Instagramの型定義
+type InstagramMedia = {
+  id: string;
+  media_url: string;
+  permalink: string;
+  media_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM';
+  thumbnail_url?: string;
+};
+
+// Instagram Graph APIからメディアを取得する関数
+async function getInstagramMedia() {
+  const accessToken = 'EAAWR2ZCLM3mEBQkQRpXaZA2CGh8VsLkXInUxQZC19QpSyTqD3USlNCODx5n2IgZAxgTxAPSedooZCwipWFdBYbLePpsYucbg8N6jHslHpJZBISlfIRZBYZArDJi7pbcXmOPMNuDYzEoZAO67eIzFLH30K1EpD8fCdlt4xZCGVcPclhH2B2v6MBIc0AbIplxEyBsQ0ZAUpDb4piMSc1InEBjFZAelKrxiRzDZCZBCt5pGj3XdzSTSYi9spqlfUEjirsfICWs3tN1oHZAPVwoZCQswqUUZD'; // ★取得済みのトークンをここに
+  const businessId = '17841421627468577';   // ★取得済みのビジネスIDをここに
+
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/${businessId}/media?fields=id,media_url,permalink,media_type,thumbnail_url&limit=9&access_token=${accessToken}`,
+      { next: { revalidate: 3600 } } // 1時間ごとにキャッシュ更新
+    );
+    if (!res.ok) throw new Error('Failed to fetch Instagram');
+    const data = await res.json();
+    return data.data as InstagramMedia[];
+  } catch (error) {
+    console.error('Error fetching Instagram:', error);
+    return [];
+  }
+}
+
 // microCMSからニュースを取得する関数
 async function getNews() {
   const apiKey = process.env.MICROCMS_API_KEY;
@@ -42,29 +70,32 @@ async function getSchedules() {
 
 export default async function HomePage() {
   // 並行してデータを取得
-  const newsListData = getNews();
-  const schedulesData = getSchedules();
-  const [newsList, schedules] = await Promise.all([newsListData, schedulesData]);
+  const [newsList, schedules, instaMedia] = await Promise.all([
+    getNews(),
+    getSchedules(),
+    getInstagramMedia()
+  ]);
   
   return (
     // ▼ ページ全体を包むコンテナ
-    <div className="min-h-screen w-full bg-[#333] relative">
+    <div className="min-h-screen w-full bg-[#333] relative bg-[url('/img/bg_main.jpg')] bg-fixed bg-center bg-cover">
+      
 
-      {/* ▼▼▼ スマホ幅コンテンツエリア（中央寄せ） ▼▼▼ */}
+      {/* ▼▼▼ スマホ幅コンテンツエリア（S中央寄せ） ▼▼▼ */}
       <div className="relative z-10 w-full max-w-[480px] mx-auto bg-white min-h-screen shadow-2xl flex flex-col font-sans text-[#333]">
         
-      {/* メインビジュアルエリア */}
-      <div className="w-full">
-        <Link href="/program" className="block w-full">
-           <img 
-             src="/img/bnr_program.jpg" 
-             alt="Program" 
-             className="w-full h-auto object-cover max-w-5xl mx-auto shadow-lg" 
-           />
-        </Link>
-      </div>
+        {/* メインビジュアルエリア */}
+        <div className="w-full">
+          <Link href="/program" className="block w-full">
+             <img 
+               src="/img/bnr_program.jpg" 
+               alt="Program" 
+               className="w-full h-auto object-cover max-w-5xl mx-auto shadow-lg" 
+             />
+          </Link>
+        </div>
 
-      {/* Concept Section */}
+        {/* Concept Section */}
         <section className="bg-[#6D6353] text-white text-center py-12 px-6">
           <h2 className="text-xl font-bold mb-8 tracking-wider">
             ananda(आनन्दः) とは
@@ -79,49 +110,83 @@ export default async function HomePage() {
           </p>
         </section>
 
-      {/* News Section */}
-        <NewsSection newsList={newsList} />
-
-      {/* About Section */}
-      <section className="relative h-[500px] flex items-center justify-center text-left px-6">
-          <img 
-            src="/img/bg_about.jpg" 
-            className="absolute inset-0 w-full h-full object-cover" 
-            alt="About Background" 
-          />
-        <div className="relative z-10 text-white py-10">
-            <h2 className="text-xl sm:text-2xl font-bold mb-8 leading-relaxed drop-shadow-md">
-              伝統的な古典ハタヨガを通じて<br />幸福に生きられるように
-            </h2>
-            <p className="leading-loose text-sm sm:text-base max-w-2xl mx-auto font-medium drop-shadow-sm">
-              私たちは常に、欠陥だらけの身体や心、<br />
-              そして取り巻く状況からもありとあらゆる<br />
-              制限を受けています。ヨガの瞑想や哲学、<br />
-              呼吸法、アーサナ練習は、制限だらけの<br />
-              自分を解放する術となります。<br />
-              ヨガを通じて一人でも多くの人が自分らしく<br />
-              幸せに生きられるようサポートしていきたい<br />
-              と思います。
-            </p>
+        {/* News Section */}
+        {/* ★修正: id="news" を追加 */}
+        <div id="news">
+           <NewsSection newsList={newsList} />
         </div>
-      </section>
 
-{/* Instagram Section */}
-      <section className="py-16 bg-[#F7F5F0] text-center">
-        <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Instagram</h3>
-        <h2 className="text-xl font-bold tracking-widest text-stone-700 mb-6">インスタ</h2>
-        <a 
-          href="https://www.instagram.com/anandayoga_maebashi/" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="text-stone-500 text-sm font-bold hover:text-[#EEA51A] transition-colors border-b border-stone-300 pb-1"
-        >
-          @anandayoga_maebashi
-        </a>
-      </section>
+        {/* About Section */}
+        <section className="relative h-[500px] flex items-center justify-center text-left px-6">
+            <img 
+              src="/img/bg_about.jpg" 
+              className="absolute inset-0 w-full h-full object-cover" 
+              alt="About Background" 
+            />
+          <div className="relative z-10 text-white py-10">
+              <h2 className="text-xl sm:text-2xl font-bold mb-8 leading-relaxed drop-shadow-md">
+                伝統的な古典ハタヨガを通じて<br />幸福に生きられるように
+              </h2>
+              <p className="leading-loose text-sm sm:text-base max-w-2xl mx-auto font-medium drop-shadow-sm">
+                私たちは常に、欠陥だらけの身体や心、<br />
+                そして取り巻く状況からもありとあらゆる<br />
+                制限を受けています。ヨガの瞑想や哲学、<br />
+                呼吸法、アーサナ練習は、制限だらけの<br />
+                自分を解放する術となります。<br />
+                ヨガを通じて一人でも多くの人が自分らしく<br />
+                幸せに生きられるようサポートしていきたい<br />
+                と思います。
+              </p>
+          </div>
+        </section>
 
-{/* Class Section */}
-        <section className="py-16 px-6 bg-[#F9F8F6]" id="lessons">
+        {/* Instagram Section (3行3列) */}
+        <section className="py-16 bg-[#F7F5F0] text-center px-4">
+          <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Instagram</h3>
+          <h2 className="text-xl font-bold tracking-widest text-stone-700 mb-6">インスタグラム</h2>
+          
+          {/* グリッドレイアウト 3列 */}
+          <div className="grid grid-cols-3 gap-1 mb-8 max-w-[400px] mx-auto">
+            {instaMedia.length > 0 ? (
+              instaMedia.map((media) => (
+                <a 
+                  key={media.id} 
+                  href={media.permalink} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="aspect-square relative overflow-hidden group bg-stone-200"
+                >
+                  <img 
+                    src={media.media_type === 'VIDEO' ? media.thumbnail_url : media.media_url} 
+                    alt="Instagram post" 
+                    className="w-full h-full object-cover transition duration-300 group-hover:scale-110"
+                  />
+                  {/* 動画アイコン表示（任意） */}
+                  {media.media_type === 'VIDEO' && (
+                    <div className="absolute top-1 right-1 text-white drop-shadow-md">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                  )}
+                </a>
+              ))
+            ) : (
+              <div className="col-span-3 py-10 text-stone-400 text-sm">読み込み中、または設定が必要です</div>
+            )}
+          </div>
+
+          <a 
+            href="https://www.instagram.com/anandayoga_maebashi/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-stone-500 text-sm font-bold hover:text-[#EEA51A] transition-colors border-b border-stone-300 pb-1"
+          >
+            @anandayoga_maebashi
+          </a>
+        </section>
+
+        {/* Class Section */}
+        {/* ★修正: id="lessons" を id="class" に変更 */}
+        <section className="py-16 px-6 bg-[#F9F8F6]" id="class">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-10">
               <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Class</h3>
@@ -147,7 +212,8 @@ export default async function HomePage() {
           </div>
         </section>
 
-{/* Price Section */}
+        {/* Price Section */}
+        {/* 既存: id="price" (OK) */}
         <section className="py-20 bg-white" id="price">
           <div className="max-w-sm mx-auto px-4">
             <div className="text-center mb-10">
@@ -174,16 +240,16 @@ export default async function HomePage() {
                   </div>
                   <div className="space-y-3">
                      <div className="bg-stone-500 text-white p-4 text-center rounded-xl">
-                        <div className="text-xs mb-1 font-medium">月4回コース</div>
-                        <div className="text-lg font-bold tracking-wide">月額 ¥8,800 <span className="text-xs font-normal opacity-80">(税込¥9,680)</span></div>
+                       <div className="text-xs mb-1 font-medium">月4回コース</div>
+                       <div className="text-lg font-bold tracking-wide">月額 ¥8,800 <span className="text-xs font-normal opacity-80">(税込¥9,680)</span></div>
                      </div>
                      <div className="bg-stone-500 text-white p-4 text-center rounded-xl">
-                        <div className="text-xs mb-1 font-medium">月5回コース</div>
-                        <div className="text-lg font-bold tracking-wide">月額 ¥9,900 <span className="text-xs font-normal opacity-80">(税込¥10,890)</span></div>
+                       <div className="text-xs mb-1 font-medium">月5回コース</div>
+                       <div className="text-lg font-bold tracking-wide">月額 ¥9,900 <span className="text-xs font-normal opacity-80">(税込¥10,890)</span></div>
                      </div>
                      <div className="bg-[#EEA51A] text-white p-4 text-center rounded-xl shadow-md transform scale-105">
-                        <div className="text-xs mb-1 font-bold">通い放題コース</div>
-                        <div className="text-lg font-bold tracking-wide">月額 ¥13,800 <span className="text-xs font-normal opacity-80">(税込¥15,180)</span></div>
+                       <div className="text-xs mb-1 font-bold">通い放題コース</div>
+                       <div className="text-lg font-bold tracking-wide">月額 ¥13,800 <span className="text-xs font-normal opacity-80">(税込¥15,180)</span></div>
                      </div>
                   </div>
                   <div className="mt-6 text-xs text-stone-500 bg-stone-50 p-4 rounded-xl">
@@ -288,46 +354,48 @@ export default async function HomePage() {
           </div>
         </section>
         
-      {/* Trial Lesson Section */}
-      <section className="py-20 text-center" id="trial">
-        <div className="section-inner max-w-4xl mx-auto px-4">
-          <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Trial lesson</h3>
-          <h2 className="text-xl font-bold tracking-widest text-stone-700 mb-10">体験レッスンの流れ</h2>
-          
-          <div className="bg-white border-2 border-[#EEA51A] p-8 rounded-none max-w-md mx-auto mb-12 shadow-[4px_4px_0px_0px_rgba(238,165,26,0.2)]">
-            <div className="font-bold text-sm mb-2">初めての方限定</div>
-            <div className="text-2xl font-bold text-[#EEA51A] mb-1">体験レッスン ¥2,200</div>
-            <p className="text-xs text-stone-500 mb-4">グループレッスンを体験いただけます。</p>
-            <div className="border border-stone-300 p-3 text-sm font-bold">
-              体験当日の会員コースご入会で<br />入会金 税込¥3,000 ⇒ ¥0
+        {/* Trial Lesson Section */}
+        {/* 既存: id="trial" (OK) */}
+        <section className="py-20 text-center" id="trial">
+          <div className="section-inner max-w-4xl mx-auto px-4">
+            <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Trial lesson</h3>
+            <h2 className="text-xl font-bold tracking-widest text-stone-700 mb-10">体験レッスンの流れ</h2>
+            
+            <div className="bg-white border-2 border-[#EEA51A] p-8 rounded-none max-w-md mx-auto mb-12 shadow-[4px_4px_0px_0px_rgba(238,165,26,0.2)]">
+              <div className="font-bold text-sm mb-2">初めての方限定</div>
+              <div className="text-2xl font-bold text-[#EEA51A] mb-1">体験レッスン ¥2,200</div>
+              <p className="text-xs text-stone-500 mb-4">グループレッスンを体験いただけます。</p>
+              <div className="border border-stone-300 p-3 text-sm font-bold">
+                体験当日の会員コースご入会で<br />入会金 税込¥3,000 ⇒ ¥0
+              </div>
+            </div>
+
+            <div className="space-y-8 max-w-lg mx-auto text-left relative">
+              <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-stone-200"></div>
+              {[
+                { step: '01', text: 'レッスンスケジュールを見て、受講するレッスンを選びます。初回はオールレベルのクラスがおすすめです。' },
+                { step: '02', text: 'WEBの予約フォームからレッスンを予約します。' },
+                { step: '03', text: '当日は、ヨガのできる動きやすい服装にあらかじめ着替えて、レッスン開始時刻の10分前にお越しください。' },
+                { step: '04', text: 'スタジオに着いたら最初に同意書のご記入、受講料のお支払いをして、レッスンをお楽しみください。' },
+              ].map((item) => (
+                <div key={item.step} className="flex gap-6 relative z-10 bg-white items-start">
+                  <div className="text-stone-200 font-bold text-4xl font-serif leading-none flex-shrink-0 bg-white pb-2 pr-2">
+                      <span className="text-sm block text-stone-300 -mb-1">STEP</span>{item.step}
+                  </div>
+                  <p className="text-sm leading-relaxed pt-2 font-medium text-stone-600">{item.text}</p>
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-8 text-xs text-stone-500 border border-stone-200 p-2 inline-block">
+                お持ち物 | 水・汗拭き用フェイスタオル<br/>
+                (ヨガマットは無料レンタルがございます)
             </div>
           </div>
+        </section>
 
-          <div className="space-y-8 max-w-lg mx-auto text-left relative">
-            <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-stone-200"></div>
-            {[
-              { step: '01', text: 'レッスンスケジュールを見て、受講するレッスンを選びます。初回はオールレベルのクラスがおすすめです。' },
-              { step: '02', text: 'WEBの予約フォームからレッスンを予約します。' },
-              { step: '03', text: '当日は、ヨガのできる動きやすい服装にあらかじめ着替えて、レッスン開始時刻の10分前にお越しください。' },
-              { step: '04', text: 'スタジオに着いたら最初に同意書のご記入、受講料のお支払いをして、レッスンをお楽しみください。' },
-            ].map((item) => (
-              <div key={item.step} className="flex gap-6 relative z-10 bg-white items-start">
-                <div className="text-stone-200 font-bold text-4xl font-serif leading-none flex-shrink-0 bg-white pb-2 pr-2">
-                    <span className="text-sm block text-stone-300 -mb-1">STEP</span>{item.step}
-                </div>
-                <p className="text-sm leading-relaxed pt-2 font-medium text-stone-600">{item.text}</p>
-              </div>
-            ))}
-          </div>
-          
-          <div className="mt-8 text-xs text-stone-500 border border-stone-200 p-2 inline-block">
-              お持ち物 | 水・汗拭き用フェイスタオル<br/>
-              (ヨガマットは無料レンタルがございます)
-          </div>
-        </div>
-      </section>
-
-{/* Access Section */}
+        {/* Access Section */}
+        {/* 既存: id="access" (OK) */}
         <section id="access" className="py-20 bg-[#F7F5F0]">
           <div className="max-w-4xl mx-auto px-4 text-center">
             <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Access</h3>
@@ -404,15 +472,15 @@ export default async function HomePage() {
           </div>
         </section>
 
-{/* Instructor Section */}
-        <section className="py-20 bg-white">
+        {/* Instructor Section */}
+        {/* ★修正: id="instructor" を追加 */}
+        <section className="py-20 bg-white" id="instructor">
           <div className="text-center px-4 max-w-md mx-auto">
 
             <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Instructor</h3>
             <h2 className="text-xl font-bold tracking-widest text-stone-800 mb-10">講師</h2>
             
             {/* 1. プロフィール写真 */}
-            {/* 修正: 角丸(rounded-2xl)と影(shadow-lg)を追加してリッチな印象に */}
             <div className="mb-8 max-w-[320px] mx-auto">
                <img 
                  src="/img/instructor01.jpg" 
@@ -422,7 +490,6 @@ export default async function HomePage() {
             </div>
 
             {/* 2. 名前 */}
-            {/* 修正: レイアウトとフォントサイズを微調整 */}
             <div className="mb-6 text-[#0F2849]">
                <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
                  <h3 className="font-bold text-2xl tracking-widest">小林哲朗</h3>
@@ -430,27 +497,25 @@ export default async function HomePage() {
                </div>
             </div>
 
-            {/* 3. バッジ (画像に変更) */}
-            {/* 修正: CSSでの円形描画を廃止し、imgタグに変更しました */}
+            {/* 3. バッジ */}
             <div className="flex justify-center gap-3 mb-10">
                <div className="w-25 h-25">
                   <img 
-                    src="/img/ryt200.png" // ★アテの画像パス (RYT200)
+                    src="/img/ryt200.png" 
                     alt="RYT200"
                     className="w-full h-full object-contain drop-shadow-sm"
                   />
                </div>
                <div className="w-25 h-25">
                   <img 
-                    src="/img/e-ryt500.png" // ★アテの画像パス (E-RYT500)
+                    src="/img/e-ryt500.png" 
                     alt="E-RYT500"
                     className="w-full h-full object-contain drop-shadow-sm"
                   />
                </div>
             </div>
 
-{/* 4. 資格リスト */}
-            {/* 修正: 枠線とラベルを追加し、チェックマークを使ってより目立たせました */}
+            {/* 4. 資格リスト */}
             <div className="relative inline-block text-left bg-white px-10 py-8 rounded-2xl shadow-[0_4px_20px_-4px_rgba(238,165,26,0.15)] mb-12 border-2 border-[#EEA51A]/20 mt-4">
                {/* 上部のラベル */}
                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#EEA51A] text-white text-[10px] font-bold px-4 py-1 rounded-full tracking-widest shadow-sm border-2 border-white">
@@ -502,13 +567,12 @@ export default async function HomePage() {
                <img src="/img/instructor03.jpg" alt="Teaching" className="w-full h-auto object-cover" />
             </div>
 
-{/* 8. 紹介文 (後半・ヒストリー) */}
-            {/* デザインに合わせて背景画像を追加し、文字を白にしました */}
+            {/* 8. 紹介文 (後半・ヒストリー) */}
             <div className="relative w-full rounded-xl overflow-hidden shadow-sm">
-               {/* 背景画像 (暗くするフィルタを適用して文字を見やすく) */}
+               {/* 背景画像 */}
                <div className="absolute inset-0">
                   <img 
-                    src="/img/bg-history.jpg"  // ★この画像を public/img フォルダに追加してください
+                    src="/img/bg-history.jpg" 
                     alt="Background" 
                     className="w-full h-full object-cover" 
                   />
@@ -531,17 +595,17 @@ export default async function HomePage() {
           </div>
         </section>
 
-      {/* Schedule Section */}
-      <section className="py-16 bg-[#F7F5F0]" id="schedule">
-        <div className="max-w-5xl mx-auto px-4">
-          <div className="text-center mb-10">
-            <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Schedule</h3>
-            <h2 className="text-xl font-bold tracking-widest text-stone-700">スケジュール</h2>
+        {/* Schedule Section */}
+        <section className="py-16 bg-[#F7F5F0]" id="schedule">
+          <div className="max-w-5xl mx-auto px-4">
+            <div className="text-center mb-10">
+              <h3 className="text-[#EEA51A] font-bold text-lg mb-1 font-sans tracking-wide">Schedule</h3>
+              <h2 className="text-xl font-bold tracking-widest text-stone-700">スケジュール</h2>
+            </div>
+            <ScheduleSection schedules={schedules} />
           </div>
-          <ScheduleSection schedules={schedules} />
-        </div>
-      </section>
-    </div>
+        </section>
+      </div>
     </div>
   );
 }
