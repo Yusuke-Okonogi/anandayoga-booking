@@ -287,7 +287,7 @@ export default function CheckInPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F5F0] p-4 md:p-8 font-sans text-stone-700">
+    <div className="min-h-screen bg-[#F7F5F0] p-4 md:p-8 font-sans text-stone-700 md:pl-[332px]">
       <div className="max-w-4xl mx-auto">
         
         {/* ヘッダー：ロゴを削除しタイトルのみ表示 */}
@@ -295,7 +295,7 @@ export default function CheckInPage() {
           <div className="flex items-center gap-4 w-full md:w-auto">
             {/* ロゴ画像削除 */}
             <h1 className="text-lg md:text-2xl font-bold text-stone-700 pl-2 md:pl-0 h-6 md:h-10 flex items-center whitespace-nowrap">
-              予約・チェックイン
+              チェックイン
             </h1>
           </div>
           

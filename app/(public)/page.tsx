@@ -13,15 +13,28 @@ type InstagramMedia = {
 
 // Instagram Graph APIからメディアを取得する関数
 async function getInstagramMedia() {
-  const accessToken = 'EAAWR2ZCLM3mEBQkQRpXaZA2CGh8VsLkXInUxQZC19QpSyTqD3USlNCODx5n2IgZAxgTxAPSedooZCwipWFdBYbLePpsYucbg8N6jHslHpJZBISlfIRZBYZArDJi7pbcXmOPMNuDYzEoZAO67eIzFLH30K1EpD8fCdlt4xZCGVcPclhH2B2v6MBIc0AbIplxEyBsQ0ZAUpDb4piMSc1InEBjFZAelKrxiRzDZCZBCt5pGj3XdzSTSYi9spqlfUEjirsfICWs3tN1oHZAPVwoZCQswqUUZD'; // ★取得済みのトークンをここに
-  const businessId = '17841421627468577';   // ★取得済みのビジネスIDをここに
+  // 環境変数から読み込む
+  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+  const businessId = process.env.INSTAGRAM_BUSINESS_ID;
+
+  if (!accessToken || !businessId) {
+    console.error('Instagram API Key or ID is missing');
+    return [];
+  }
 
   try {
     const res = await fetch(
       `https://graph.facebook.com/v21.0/${businessId}/media?fields=id,media_url,permalink,media_type,thumbnail_url&limit=9&access_token=${accessToken}`,
-      { next: { revalidate: 3600 } } // 1時間ごとにキャッシュ更新
+      { next: { revalidate: 3600 } }
     );
-    if (!res.ok) throw new Error('Failed to fetch Instagram');
+
+    if (!res.ok) {
+      // エラーの詳細をVercelのログに出すためにテキストを取得
+      const errorDetail = await res.text();
+      console.error(`Failed to fetch Instagram: ${res.status} ${res.statusText}`, errorDetail);
+      throw new Error('Failed to fetch Instagram');
+    }
+
     const data = await res.json();
     return data.data as InstagramMedia[];
   } catch (error) {
@@ -545,7 +558,7 @@ export default async function HomePage() {
                     <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#FFF8E1] text-[#EEA51A] text-xs">
                       ✓
                     </span>
-                    ヨガ指導歴12年
+                    ヨガ指導歴13年
                   </li>
                </ul>
             </div>

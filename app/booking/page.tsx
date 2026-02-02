@@ -5,6 +5,14 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import NewsSection, { News } from '../components/NewsSection';
 import ScheduleSection from '../components/ScheduleSection';
+import Link from 'next/link';
+import { 
+  format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, 
+  startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay, isSameMonth, 
+  parseISO, startOfDay, endOfDay
+} from 'date-fns';
+import { ja } from 'date-fns/locale';
+
 // microCMSからニュースを取得する関数
 async function getNews() {
   const apiKey = process.env.MICROCMS_API_KEY;
@@ -23,12 +31,11 @@ async function getNews() {
     return [];
   }
 }
+
 // microCMSからスケジュールを取得する関数 (クライアント用)
 async function getSchedules() {
   try {
-    // 自分のサーバーのAPIルートを叩く (APIキーは不要)
     const res = await fetch('/api/schedules');
-    
     if (!res.ok) throw new Error('Failed to fetch schedules');
     const data = await res.json();
     return data.contents as News[];
@@ -37,13 +44,6 @@ async function getSchedules() {
     return [];
   }
 }
-import Link from 'next/link';
-import { 
-  format, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, 
-  startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay, isSameMonth, 
-  parseISO, startOfDay, endOfDay
-} from 'date-fns';
-import { ja } from 'date-fns/locale';
 
 type Lesson = {
   id: string;
@@ -77,7 +77,10 @@ export default function Home() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [targetLesson, setTargetLesson] = useState<Lesson | null>(null);
   const [visitorMode, setVisitorMode] = useState(false);
-  const [visitorForm, setVisitorForm] = useState({ fullName: '', email: '', phone: '', notes: '' });
+  const [visitorForm, setVisitorForm] = useState({ fullName: '', email: '', phone: '' });
+
+  // ★追加: パーソナル予約リクエスト用の入力state (会員・ビジター共通)
+  const [personalInput, setPersonalInput] = useState({ time1: '', time2: '', remarks: '' });
 
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [contactForm, setContactForm] = useState({ subject: '', body: '' });
@@ -110,7 +113,6 @@ export default function Home() {
       const scheduleData = await getSchedules();
       setSchedules(scheduleData);
     };
-
 
     fetchUser();
     fetchContent();
@@ -177,7 +179,9 @@ export default function Home() {
     } else {
       setTargetLesson(lesson);
       setVisitorMode(false);
-      setVisitorForm({ fullName: '', email: '', phone: '', notes: '' });
+      setVisitorForm({ fullName: '', email: '', phone: '' });
+      // ビジター用も初期化
+      setPersonalInput({ time1: '', time2: '', remarks: '' });
       setShowLoginModal(true);
     }
   };
@@ -275,20 +279,36 @@ export default function Home() {
     if (!user) {
       setTargetLesson(lesson);
       setVisitorMode(false);
-      setVisitorForm({ fullName: '', email: '', phone: '', notes: '' });
+      setVisitorForm({ fullName: '', email: '', phone: '' });
+      setPersonalInput({ time1: '', time2: '', remarks: '' });
       setShowLoginModal(true);
       return;
     }
+    
+    setTargetLesson(lesson);
+    // 初期化
+    setPersonalInput({ time1: '', time2: '', remarks: '' });
+    // 件名だけセット（bodyはsubmit時に生成）
     setContactForm({
       subject: `パーソナル予約希望: ${lesson.title}`,
-      body: `希望日時:\n・第一希望: \n・第二希望: \n\nその他ご要望:\n`
+      body: '' 
     });
     setContactModalOpen(true);
   };
 
   const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contactForm.subject || !contactForm.body) return;
+    
+    // パーソナルの場合のバリデーション
+    if (targetLesson?.type === 'personal') {
+        if (!personalInput.time1) {
+            alert('第一希望時間は必須です');
+            return;
+        }
+    } else {
+        if (!contactForm.subject || !contactForm.body) return;
+    }
+
     setSendingContact(true);
 
     try {
@@ -303,6 +323,19 @@ export default function Home() {
         }
       }
 
+      // 送信用の本文を作成
+      let finalBody = contactForm.body;
+      if (targetLesson?.type === 'personal') {
+          finalBody = `
+■希望日時
+・第一希望: ${personalInput.time1}
+・第二希望: ${personalInput.time2 || 'なし'}
+
+■備考
+${personalInput.remarks || 'なし'}
+          `;
+      }
+
       const res = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -311,7 +344,7 @@ export default function Home() {
           userEmail: userEmail,
           userName: userName,
           contactSubject: contactForm.subject,
-          contactBody: contactForm.body
+          contactBody: finalBody
         }),
       });
 
@@ -320,6 +353,8 @@ export default function Home() {
       alert('リクエストを送信しました。\n担当者からの連絡をお待ちください。');
       setContactModalOpen(false);
       setContactForm({ subject: '', body: '' });
+      setPersonalInput({ time1: '', time2: '', remarks: '' });
+      setTargetLesson(null);
 
     } catch (err) {
       alert('送信に失敗しました。');
@@ -331,8 +366,8 @@ export default function Home() {
     e.preventDefault();
     if (!targetLesson || !visitorForm.fullName || !visitorForm.email) return;
 
-    if (targetLesson.type === 'personal' && !visitorForm.notes) {
-      alert('希望日時をご記入ください');
+    if (targetLesson.type === 'personal' && !personalInput.time1) {
+      alert('第一希望時間は必須です');
       return;
     }
 
@@ -359,8 +394,12 @@ ${targetLesson.title}
 Email: ${visitorForm.email}
 電話: ${visitorForm.phone}
 
-■希望日時・備考
-${visitorForm.notes}
+■希望日時
+・第一希望: ${personalInput.time1}
+・第二希望: ${personalInput.time2 || 'なし'}
+
+■備考
+${personalInput.remarks || 'なし'}
             `
           }),
         });
@@ -541,7 +580,7 @@ ${visitorForm.notes}
             予約・キャンセルは<span className="font-bold text-stone-600">開始1時間前</span>まで
             <span className="mx-2 text-stone-300 hidden sm:inline">|</span>
             <br className="sm:hidden" />
-            パーソナルは<span className="font-bold text-stone-600">前日</span>まで
+            パーソナルは<span className="font-bold text-stone-600">前々日</span>まで
           </div>
           <ScheduleSection schedules={schedules} isCompact />
           {/* コントロールバー */}
@@ -695,47 +734,46 @@ ${visitorForm.notes}
                                   
                                   <div className="w-full sm:w-auto mt-2 sm:mt-0 flex flex-col items-stretch sm:items-end gap-2">
                                     {isReserved ? (
-                                        // 予約済み -> キャンセルボタン
-                                        <button 
-                                          onClick={() => handleCancel(userReservation!.id, lesson.title, lesson.start_time, lesson.instructor_name)}
-                                          className="w-full sm:w-32 bg-white text-red-500 border border-red-200 text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 hover:bg-red-50 hover:border-red-400 shadow-sm"
-                                        >
-                                          キャンセル
-                                        </button>
+                                      // 予約済み -> キャンセルボタン
+                                      <button 
+                                        onClick={() => handleCancel(userReservation!.id, lesson.title, lesson.start_time, lesson.instructor_name)}
+                                        className="w-full sm:w-32 bg-white text-red-500 border border-red-200 text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 hover:bg-red-50 hover:border-red-400 shadow-sm"
+                                      >
+                                        キャンセル
+                                      </button>
                                     ) : lesson.type === 'personal' ? (
-                                        // パーソナル -> リクエストボタン (満員時は受付終了)
-                                        <button 
-                                          onClick={() => openPersonalRequest(lesson)}
-                                          disabled={status.isFull}
-                                          className={`w-full sm:w-32 text-white text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 shadow-md ${
-                                            status.isFull 
-                                              ? 'bg-stone-400 cursor-not-allowed' 
-                                              : 'bg-indigo-600 hover:bg-indigo-700'
-                                          }`}
-                                        >
-                                          {status.isFull ? '受付終了' : '予約リクエスト'}
-                                        </button>
+                                      // パーソナル -> リクエストボタン (満員時は受付終了)
+                                      <button 
+                                        onClick={() => openPersonalRequest(lesson)}
+                                        disabled={status.isFull}
+                                        className={`w-full sm:w-32 text-white text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 shadow-md ${
+                                          status.isFull 
+                                            ? 'bg-stone-400 cursor-not-allowed' 
+                                            : 'bg-indigo-600 hover:bg-indigo-700'
+                                        }`}
+                                      >
+                                        {status.isFull ? '受付終了' : '予約リクエスト'}
+                                      </button>
                                     ) : lesson.type === 'training' ? (
-                                        // 養成講座 -> ボタンなし (表示のみ)
-                                        <span className="text-xs text-slate-500 font-bold px-4 py-2 bg-slate-100 rounded-full border border-slate-200 text-center">
-                                           ※予約不可
-                                        </span>
+                                      // 養成講座 -> ボタンなし (表示のみ)
+                                      <span className="text-xs text-slate-500 font-bold px-4 py-2 bg-slate-100 rounded-full border border-slate-200 text-center">
+                                        ※予約不可
+                                      </span>
                                     ) : (
-                                        // 通常 -> 予約ボタン (未ログインでも押せる)
-                                        // ★修正: 満員 or 時間外の場合はボタン無効化
-                                        <button 
-                                          onClick={() => handleReserveClick(lesson)}
-                                          disabled={reservingId === lesson.id || status.isFull || !isReservableTime}
-                                          className={`w-full sm:w-32 text-white text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${
-                                            !isReservableTime
-                                              ? 'bg-stone-300' 
-                                              : status.isFull 
-                                                ? 'bg-stone-400' 
-                                                : 'bg-stone-800 hover:bg-[#EEA51A]'
-                                          }`}
-                                        >
-                                          {reservingId === lesson.id ? '予約中...' : !isReservableTime ? '受付終了' : status.isFull ? '満員' : '予約する'}
-                                        </button>
+                                      // 通常 -> 予約ボタン (未ログインでも押せる)
+                                      <button 
+                                        onClick={() => handleReserveClick(lesson)}
+                                        disabled={reservingId === lesson.id || status.isFull || !isReservableTime}
+                                        className={`w-full sm:w-32 text-white text-sm py-2.5 rounded-full font-bold transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md ${
+                                          !isReservableTime
+                                            ? 'bg-stone-300' 
+                                            : status.isFull 
+                                              ? 'bg-stone-400' 
+                                              : 'bg-stone-800 hover:bg-[#EEA51A]'
+                                        }`}
+                                      >
+                                        {reservingId === lesson.id ? '予約中...' : !isReservableTime ? '受付終了' : status.isFull ? '満員' : '予約する'}
+                                      </button>
                                     )}
                                   </div>
                                 </div>
@@ -817,15 +855,42 @@ ${visitorForm.notes}
                   
                   {/* パーソナルの場合のみ希望日時を表示 */}
                   {targetLesson.type === 'personal' && (
-                    <div>
-                        <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">希望日時 (必須)</label>
-                        <textarea
-                          required
-                          placeholder="第一希望: 〇月〇日 10:00〜&#13;&#10;第二希望: 〇月〇日 14:00〜"
-                          className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none h-24"
-                          value={visitorForm.notes || ''}
-                          onChange={(e) => setVisitorForm({...visitorForm, notes: e.target.value})}
-                        />
+                    <div className="space-y-3 pt-2">
+                        {/* 注意書きを追加 */}
+                        <div className="bg-red-50 p-3 rounded-lg border border-red-200 text-red-600 text-xs font-bold text-center">
+                            予約状況を確認してご連絡いたします。<br/>予約は完了していません。
+                        </div>
+                        <p className="text-sm font-bold text-stone-700 border-b pb-1">
+                            リクエスト日: {format(parseISO(targetLesson.start_time), 'M月d日(E)', { locale: ja })}
+                        </p>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">第一希望時間 (必須)</label>
+                            <input
+                                required
+                                placeholder="例: 10:00〜"
+                                className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
+                                value={personalInput.time1}
+                                onChange={(e) => setPersonalInput({...personalInput, time1: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">第二希望時間</label>
+                            <input
+                                placeholder="例: 14:00〜"
+                                className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
+                                value={personalInput.time2}
+                                onChange={(e) => setPersonalInput({...personalInput, time2: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">備考</label>
+                            <textarea
+                                placeholder="その他ご要望があればご記入ください"
+                                className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none h-20"
+                                value={personalInput.remarks}
+                                onChange={(e) => setPersonalInput({...personalInput, remarks: e.target.value})}
+                            />
+                        </div>
                     </div>
                   )}
                   
@@ -858,43 +923,89 @@ ${visitorForm.notes}
               <h3 className="text-xl font-bold text-stone-700 mb-6 flex items-center gap-2">
                 <span className="text-2xl">✉️</span> {contactForm.subject.includes('予約希望') ? '予約リクエスト' : 'お問い合わせ'}
               </h3>
+              
               <form onSubmit={handleContactSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">件名</label>
-                  <input
-                    required
-                    value={contactForm.subject}
-                    onChange={e => setContactForm({...contactForm, subject: e.target.value})}
-                    placeholder="例: 予約の変更について"
-                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">お問い合わせ内容</label>
-                  <textarea
-                    required
-                    rows={5}
-                    value={contactForm.body}
-                    onChange={e => setContactForm({...contactForm, body: e.target.value})}
-                    placeholder="詳細をご記入ください..."
-                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
-                  />
-                </div>
+                {/* パーソナルの場合は専用入力フォームを表示 */}
+                {targetLesson?.type === 'personal' ? (
+                    <div className="space-y-4">
+                        <div className="bg-red-50 p-3 rounded-lg border border-red-200 text-red-600 text-xs font-bold text-center">
+                            予約状況を確認してご連絡いたします。<br/>予約は完了していません。
+                        </div>
+                        <p className="text-sm font-bold text-stone-700 border-b pb-1">
+                            リクエスト日: {format(parseISO(targetLesson.start_time), 'M月d日(E)', { locale: ja })}
+                        </p>
+                        
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">第一希望時間 (必須)</label>
+                            <input
+                                required
+                                placeholder="例: 10:00〜"
+                                className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
+                                value={personalInput.time1}
+                                onChange={e => setPersonalInput({...personalInput, time1: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">第二希望時間</label>
+                            <input
+                                placeholder="例: 14:00〜"
+                                className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
+                                value={personalInput.time2}
+                                onChange={e => setPersonalInput({...personalInput, time2: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">備考</label>
+                            <textarea
+                                rows={3}
+                                placeholder="その他ご要望があればご記入ください"
+                                className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
+                                value={personalInput.remarks}
+                                onChange={e => setPersonalInput({...personalInput, remarks: e.target.value})}
+                            />
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <div>
+                        <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">件名</label>
+                        <input
+                            required
+                            value={contactForm.subject}
+                            onChange={e => setContactForm({...contactForm, subject: e.target.value})}
+                            placeholder="例: 予約の変更について"
+                            className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
+                        />
+                        </div>
+                        <div>
+                        <label className="block text-xs font-bold text-stone-500 mb-1 ml-1">お問い合わせ内容</label>
+                        <textarea
+                            required
+                            rows={5}
+                            value={contactForm.body}
+                            onChange={e => setContactForm({...contactForm, body: e.target.value})}
+                            placeholder="詳細をご記入ください..."
+                            className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none"
+                        />
+                        </div>
+                    </>
+                )}
+
                 <div className="pt-2 flex gap-3">
-                   <button
-                     type="button"
-                     onClick={() => setContactModalOpen(false)}
-                     className="flex-1 bg-stone-100 text-stone-500 font-bold py-3 rounded-xl hover:bg-stone-200"
-                   >
-                     キャンセル
-                   </button>
-                   <button
-                     type="submit"
-                     disabled={sendingContact}
-                     className="flex-1 bg-[#EEA51A] text-white font-bold py-3 rounded-xl hover:bg-[#D99000] disabled:opacity-50 transition shadow-md"
-                   >
-                     {sendingContact ? '送信中...' : '送信する'}
-                   </button>
+                    <button
+                      type="button"
+                      onClick={() => setContactModalOpen(false)}
+                      className="flex-1 bg-stone-100 text-stone-500 font-bold py-3 rounded-xl hover:bg-stone-200"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={sendingContact}
+                      className="flex-1 bg-[#EEA51A] text-white font-bold py-3 rounded-xl hover:bg-[#D99000] disabled:opacity-50 transition shadow-md"
+                    >
+                      {sendingContact ? '送信中...' : '送信する'}
+                    </button>
                 </div>
               </form>
             </div>

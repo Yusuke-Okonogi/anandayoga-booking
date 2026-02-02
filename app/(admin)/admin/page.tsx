@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-// ... (型定義などは変更なし) ...
+// 型定義
 type Lesson = {
   id: string;
   title: string;
@@ -20,17 +20,14 @@ type Lesson = {
   reservations?: { id: string }[];
 };
 
-type Plan = { id: string; name: string; };
-type Ticket = { id: string; ticket_name: string; remaining_count: number; expires_at: string | null; };
 type Announcement = { id: string; title: string; content: string; target_tags: string[]; priority: number; created_at: string; link_url?: string; };
-type Profile = { id: string; member_number: number; email: string; full_name: string; phone: string | null; plan_id: string | null; plans: Plan | null; user_tickets: Ticket[]; line_user_id: string | null; notes: string | null; training_status: string | null; tags: string[] | null; };
+type Profile = { id: string; member_number: number; email: string; full_name: string; phone: string | null; line_user_id: string | null; training_status: string | null; tags: string[] | null; };
 
-// 内部コンポーネント: 実際のコンテンツ
+// 内部コンポーネント
 function AdminContent() {
-  // ... (状態管理や関数ロジックは変更なし) ...
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'lessons' | 'users' | 'plans' | 'announcements'>('lessons');
+  const [activeTab, setActiveTab] = useState<'lessons' | 'users' | 'announcements'>('lessons');
   
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -62,24 +59,20 @@ function AdminContent() {
   const [users, setUsers] = useState<Profile[]>([]);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
-  const [userFormData, setUserFormData] = useState({ email: '', full_name: '', phone: '', plan_id: '', notes: '', training_status: '未受講', tags: '' });
+  const [userFormData, setUserFormData] = useState({ email: '', full_name: '', phone: '', training_status: '未受講', tags: '' });
   const [createdPassword, setCreatedPassword] = useState('');
-
-  const [ticketUserId, setTicketUserId] = useState<string | null>(null);
-  const [ticketForm, setTicketForm] = useState({ ticket_name: '5回券', remaining_count: 5, expires_at: '' });
-
-  // --- プラン管理用 ---
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [newPlanName, setNewPlanName] = useState('');
 
   // --- お知らせ管理用 ---
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  // ★追加: お知らせ用モーダル開閉ステート
+  const [announcementModalOpen, setAnnouncementModalOpen] = useState(false);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
   const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', target_tags: '', priority: 0, link_url: '' });
 
   // URLクエリパラメータからタブを切り替える処理
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['lessons', 'users', 'plans', 'announcements'].includes(tab)) {
+    if (tab && ['lessons', 'users', 'announcements'].includes(tab)) {
       setActiveTab(tab as any);
     }
   }, [searchParams]);
@@ -87,21 +80,15 @@ function AdminContent() {
   useEffect(() => {
     const checkAdmin = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        return; 
-      }
+      if (!user) { return; }
       
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
 
       if (profile?.role !== 'admin') {
         alert('管理者権限がありません。トップページへ移動します。');
         router.push('/');
       } else {
-        Promise.all([fetchLessons(), fetchPlans(), fetchUsers(), fetchAnnouncements()]).then(() => {
+        Promise.all([fetchLessons(), fetchUsers(), fetchAnnouncements()]).then(() => {
           setInitLoading(false);
         });
       }
@@ -111,7 +98,6 @@ function AdminContent() {
 
   useEffect(() => {
     if (activeTab === 'users') fetchUsers();
-    if (activeTab === 'plans') fetchPlans();
     if (activeTab === 'announcements') fetchAnnouncements();
   }, [activeTab]);
 
@@ -126,14 +112,12 @@ function AdminContent() {
       .order('start_time', { ascending: true });
     if (data) setLessons(data as any);
   };
+
   const fetchUsers = async () => {
-    const { data } = await supabase.from('profiles').select(`*, plans (id, name), user_tickets (*)`).order('member_number', { ascending: true });
+    const { data } = await supabase.from('profiles').select(`*`).order('member_number', { ascending: true });
     if (data) setUsers(data as any);
   };
-  const fetchPlans = async () => {
-    const { data } = await supabase.from('plans').select('*').order('created_at', { ascending: true });
-    if (data) setPlans(data);
-  };
+
   const fetchAnnouncements = async () => {
     const { data } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
     if (data) setAnnouncements(data);
@@ -280,10 +264,16 @@ function AdminContent() {
   const openUserModal = (user?: Profile) => {
     if (user) {
       setEditingUser(user);
-      setUserFormData({ email: user.email, full_name: user.full_name, phone: user.phone || '', plan_id: user.plan_id || '', notes: user.notes || '', training_status: user.training_status || '未受講', tags: user.tags ? user.tags.join(', ') : '' });
+      setUserFormData({ 
+        email: user.email, 
+        full_name: user.full_name, 
+        phone: user.phone || '', 
+        training_status: user.training_status || '未受講', 
+        tags: user.tags ? user.tags.join(', ') : '' 
+      });
     } else {
       setEditingUser(null);
-      setUserFormData({ email: '', full_name: '', phone: '', plan_id: '', notes: '', training_status: '未受講', tags: '' });
+      setUserFormData({ email: '', full_name: '', phone: '', training_status: '未受講', tags: '' });
       setCreatedPassword('');
     }
     setUserModalOpen(true);
@@ -326,42 +316,57 @@ function AdminContent() {
     } catch (err: any) { alert(`削除失敗: ${err.message}`); }
   };
 
-  const handleTicketAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!ticketUserId) return;
-    const { error } = await supabase.from('user_tickets').insert([{ user_id: ticketUserId, ticket_name: ticketForm.ticket_name, remaining_count: ticketForm.remaining_count, expires_at: ticketForm.expires_at || null }]);
-    if (error) alert(`チケット追加エラー: ${error.message}`);
-    else { setMessage('✅ 回数券を追加しました'); setTicketUserId(null); fetchUsers(); }
-  };
-
-  const handleTicketDelete = async (ticketId: string) => {
-    if(!confirm('この回数券を削除しますか？')) return;
-    const { error } = await supabase.from('user_tickets').delete().eq('id', ticketId);
-    if(error) alert('削除失敗'); else { setMessage('🗑️ 回数券を削除しました'); fetchUsers(); }
-  }
-
-  // --- プラン管理機能 ---
-  const handlePlanAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPlanName.trim()) return;
-    const { error } = await supabase.from('plans').insert([{ name: newPlanName }]);
-    if (error) alert(`追加エラー: ${error.message}`); else { setMessage('✅ プランを追加しました'); setNewPlanName(''); fetchPlans(); }
-  };
-
-  const handlePlanDelete = async (id: string) => {
-    if (!confirm('このプランを削除しますか？')) return;
-    const { error } = await supabase.from('plans').delete().eq('id', id);
-    if (error) alert(`削除エラー: ${error.message}`); else { setMessage('🗑️ プランを削除しました'); fetchPlans(); }
-  };
-
   // --- お知らせ管理機能 ---
+  
+  // ★追加: お知らせモーダルを開く関数（新規・編集共通）
+  const openAnnouncementModal = (ann?: Announcement) => {
+    if (ann) {
+      setEditingAnnouncementId(ann.id);
+      setAnnouncementForm({
+        title: ann.title,
+        content: ann.content,
+        target_tags: ann.target_tags ? ann.target_tags.join(', ') : '',
+        priority: ann.priority,
+        link_url: ann.link_url || ''
+      });
+    } else {
+      setEditingAnnouncementId(null);
+      setAnnouncementForm({ title: '', content: '', target_tags: '', priority: 0, link_url: '' });
+    }
+    setAnnouncementModalOpen(true);
+  };
+
   const handleAnnouncementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!announcementForm.title || !announcementForm.content) return;
     setLoading(true);
     const tagsArray = announcementForm.target_tags.split(',').map(t => t.trim()).filter(t => t !== '');
-    const { error } = await supabase.from('announcements').insert([{ title: announcementForm.title, content: announcementForm.content, target_tags: tagsArray, priority: announcementForm.priority || 0, link_url: announcementForm.link_url || null }]);
-    if (error) alert(`投稿エラー: ${error.message}`); else { setMessage('✅ お知らせを投稿しました'); setAnnouncementForm({ title: '', content: '', target_tags: '', priority: 0, link_url: '' }); fetchAnnouncements(); }
+    
+    const payload = { 
+      title: announcementForm.title, 
+      content: announcementForm.content, 
+      target_tags: tagsArray, 
+      priority: announcementForm.priority || 0, 
+      link_url: announcementForm.link_url || null 
+    };
+
+    try {
+      if (editingAnnouncementId) {
+        // 更新処理
+        const { error } = await supabase.from('announcements').update(payload).eq('id', editingAnnouncementId);
+        if (error) throw error;
+        setMessage('✅ お知らせを更新しました');
+      } else {
+        // 新規登録
+        const { error } = await supabase.from('announcements').insert([payload]);
+        if (error) throw error;
+        setMessage('✅ お知らせを投稿しました');
+      }
+      setAnnouncementModalOpen(false); // モーダルを閉じる
+      fetchAnnouncements();
+    } catch (error: any) {
+      alert(`エラー: ${error.message}`);
+    }
     setLoading(false);
   };
 
@@ -381,8 +386,6 @@ function AdminContent() {
     );
   }
 
-  // ★修正: md:ml-[300px] を削除し、md:pl-[332px] (300px + p-8の32px) に変更
-  // これにより、背景色は画面左端まで伸びたまま、コンテンツのみが右にずれます
   return (
     <div className="min-h-screen bg-[#F7F5F0] p-4 sm:p-8 font-sans text-stone-700 md:pl-[332px]">
       <div className="max-w-4xl mx-auto space-y-5">
@@ -401,7 +404,6 @@ function AdminContent() {
           </Link>
         </div>
 
-        {/* ... (残りのJSXコードは変更なし) ... */}
         {/* タブナビゲーション */}
         <div className="flex gap-2 border-b-2 border-stone-200 pb-1 overflow-x-auto text-base">
           <button 
@@ -417,12 +419,6 @@ function AdminContent() {
             ユーザー管理
           </button>
           <button 
-            onClick={() => setActiveTab('plans')}
-            className={`px-6 py-2 rounded-t-lg font-bold transition whitespace-nowrap ${activeTab === 'plans' ? 'bg-[#EEA51A] text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}`}
-          >
-            プラン管理
-          </button>
-          <button 
             onClick={() => setActiveTab('announcements')}
             className={`px-6 py-2 rounded-t-lg font-bold transition whitespace-nowrap ${activeTab === 'announcements' ? 'bg-[#EEA51A] text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}`}
           >
@@ -430,127 +426,119 @@ function AdminContent() {
           </button>
         </div>
 
-        {/* ... 各タブのコンテンツ (変更なし) ... */}
+        {/* タブ1: 予約管理 */}
         {activeTab === 'lessons' && (
           <div className="space-y-8 animate-fadeIn">
-             {/* ... */}
-             {/* タブ1: 予約管理 内の Googleカレンダー連携セクション */}
-<div className="bg-white p-6 rounded-3xl shadow-sm border border-blue-100">
-  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-    <div className="flex-1">
-      <h2 className="text-lg font-bold text-blue-800 mb-3 flex items-center gap-2">
-        📅 Googleカレンダー連携
-      </h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 時間枠（カレンダーの特定の時間に配置する場合） */}
-        <div className="bg-blue-50/50 p-3 rounded-2xl border border-blue-100">
-          <p className="font-bold text-blue-800 text-[11px] mb-2 flex items-center gap-1">
-            <span className="text-base">🕒</span> 時間帯の箇所に入れる（通常クラス等）
-          </p>
-          <div className="space-y-1.5">
-            <div className="flex flex-col gap-1">
-              <code className="bg-white px-2 py-1 rounded border border-blue-200 text-blue-600 text-[11px] font-bold">
-                [★2][Tetsu][10]パワーヨガ
-              </code>
-              <span className="text-[10px] text-stone-500 ml-1">※ [レベル][講師][定員]タイトル</span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <code className="bg-white px-2 py-1 rounded border border-blue-200 text-blue-600 text-[11px] font-bold">
-                [Tetsu]RYT200養成講座
-              </code>
-              <span className="text-[10px] text-stone-500 ml-1">※ [講師]タイトル（定員なし・予約不可）</span>
-            </div>
-          </div>
-        </div>
+            {/* Googleカレンダー連携 */}
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-blue-100">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="flex-1">
+                  <h2 className="text-lg font-bold text-blue-800 mb-3 flex items-center gap-2">
+                    📅 Googleカレンダー連携
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-blue-50/50 p-3 rounded-2xl border border-blue-100">
+                      <p className="font-bold text-blue-800 text-[11px] mb-2 flex items-center gap-1">
+                        <span className="text-base">🕒</span> 時間帯の箇所に入れる（通常クラス等）
+                      </p>
+                      <div className="space-y-1.5">
+                        <div className="flex flex-col gap-1">
+                          <code className="bg-white px-2 py-1 rounded border border-blue-200 text-blue-600 text-[11px] font-bold">
+                            [★2][Tetsu][10]パワーヨガ
+                          </code>
+                          <span className="text-[10px] text-stone-500 ml-1">※ [レベル][講師][定員]タイトル</span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <code className="bg-white px-2 py-1 rounded border border-blue-200 text-blue-600 text-[11px] font-bold">
+                            [Tetsu]RYT200養成講座
+                          </code>
+                          <span className="text-[10px] text-stone-500 ml-1">※ [講師]タイトル（定員なし・予約不可）</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
+                      <p className="font-bold text-emerald-800 text-[11px] mb-2 flex items-center gap-1">
+                        <span className="text-base">☀️</span> 日の予定に入れる（パーソナル等）
+                      </p>
+                      <div className="space-y-1.5">
+                        <div className="flex flex-col gap-1">
+                          <code className="bg-white px-2 py-1 rounded border border-emerald-200 text-emerald-600 text-[11px] font-bold">
+                            [Tetsu]パーソナル
+                          </code>
+                          <span className="text-[10px] text-stone-500 ml-1">※ [講師]タイトル（日程調整用として表示）</span>
+                        </div>
+                        <p className="text-[10px] text-emerald-600 leading-relaxed mt-1 font-medium bg-white/50 p-2 rounded-lg">
+                          カレンダー最上部の「終日」欄に入れると、HP上では「日程調整（パーソナル）」枠として表示されます。
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-        {/* 日の予定（カレンダーの最上部、終日エリアに配置する場合） */}
-        <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
-          <p className="font-bold text-emerald-800 text-[11px] mb-2 flex items-center gap-1">
-            <span className="text-base">☀️</span> 日の予定に入れる（パーソナル等）
-          </p>
-          <div className="space-y-1.5">
-            <div className="flex flex-col gap-1">
-              <code className="bg-white px-2 py-1 rounded border border-emerald-200 text-emerald-600 text-[11px] font-bold">
-                [Tetsu]パーソナル
-              </code>
-              <span className="text-[10px] text-stone-500 ml-1">※ [講師]タイトル（日程調整用として表示）</span>
+                <button
+                  type="button"
+                  onClick={handleSync}
+                  disabled={syncLoading}
+                  className="w-full md:w-auto whitespace-nowrap bg-blue-600 text-white font-bold py-4 px-8 rounded-2xl hover:bg-blue-700 transition disabled:opacity-50 flex justify-center items-center gap-2 shadow-lg hover:shadow-blue-200"
+                >
+                  {syncLoading ? (
+                    <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Googleカレンダーと同期
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-            <p className="text-[10px] text-emerald-600 leading-relaxed mt-1 font-medium bg-white/50 p-2 rounded-lg">
-              カレンダー最上部の「終日」欄に入れると、HP上では「日程調整（パーソナル）」枠として表示されます。
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <button
-      type="button"
-      onClick={handleSync}
-      disabled={syncLoading}
-      className="w-full md:w-auto whitespace-nowrap bg-blue-600 text-white font-bold py-4 px-8 rounded-2xl hover:bg-blue-700 transition disabled:opacity-50 flex justify-center items-center gap-2 shadow-lg hover:shadow-blue-200"
-    >
-      {syncLoading ? (
-        <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
-      ) : (
-        <>
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Googleカレンダーと同期
-        </>
-      )}
-    </button>
-  </div>
-</div>
+            {/* レッスンリスト */}
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200">
+              <h2 className="text-xl font-bold text-stone-700 mb-4 flex justify-between items-center">
+                同期済みのクラス一覧
+              </h2>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {lessons.map((lesson) => {
+                  const reservationCount = lesson.reservations?.length || 0;
+                  return (
+                    <div key={lesson.id} className="p-4 rounded-xl border border-stone-100 bg-[#FDFBF7] shadow-sm flex flex-col gap-3 relative">
+                      {/* 上段 */}
+                      <div>
+                         <div className="text-sm font-bold text-[#EEA51A] mb-1">
+                           {new Date(lesson.start_time).toLocaleDateString()} {new Date(lesson.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                         </div>
+                         <h3 className="font-bold text-lg text-stone-800 mb-2 truncate">{lesson.title}</h3>
+                         <div className="flex items-center gap-3 text-xs text-stone-500">
+                            <span className="whitespace-nowrap flex items-center gap-1">👤 {lesson.instructor_name}</span>
+                            <span className="bg-white px-2 py-0.5 rounded border border-stone-200">
+                               予約: {reservationCount}/{lesson.capacity}
+                            </span>
+                         </div>
+                      </div>
 
-{/* レッスンリスト（1カラムで大きく表示） */}
-<div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200">
-  <h2 className="text-xl font-bold text-stone-700 mb-4 flex justify-between items-center">
-    同期済みのクラス一覧
-  </h2>
-  
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-    {lessons.map((lesson) => {
-      const reservationCount = lesson.reservations?.length || 0;
-      return (
-        <div key={lesson.id} className="p-4 rounded-2xl border border-stone-100 bg-[#FDFBF7] flex flex-row justify-between items-center gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] font-bold text-[#EEA51A] mb-1 truncate">
-              {new Date(lesson.start_time).toLocaleDateString()} {new Date(lesson.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-            </div>
-            <h3 className="font-bold text-stone-800 text-sm truncate">{lesson.title}</h3>
-            <div className="text-[10px] text-stone-400 mt-1 flex flex-wrap gap-x-2">
-              <span className="whitespace-nowrap">👤 {lesson.instructor_name}</span>
-              <span className="whitespace-nowrap">| 予約: {reservationCount}/{lesson.capacity}</span>
-            </div>
-          </div>
-
-          {/* ボタンエリア：PCは横並び(flex-row)、SPは縦並び(flex-col) */}
-          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 shrink-0">
-            <button 
-              onClick={() => openReservationModal(lesson)} 
-              className="bg-stone-800 text-white text-[11px] px-3 py-2 rounded-xl font-bold hover:bg-[#EEA51A] transition shadow-sm whitespace-nowrap"
-            >
-              予約管理
-            </button>
-            <button 
-              onClick={() => handleLessonDelete(lesson.id)} 
-              className="flex items-center justify-center p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition border border-transparent md:border-stone-100 md:bg-white"
-              title="削除"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-              </svg>
-              {/* スマホ時のみテキストを表示したい場合は以下を有効化（今回はアイコンのみ） */}
-              <span className="md:hidden text-[10px] font-bold ml-1">削除</span>
-            </button>
-          </div>
-        </div>
-      );
-    })}
-  </div>
+                      {/* 下段：ボタンエリア */}
+                      <div className="grid grid-cols-2 gap-3 mt-auto pt-2 border-t border-stone-200/50">
+                        <button 
+                          onClick={() => openReservationModal(lesson)} 
+                          className="py-2 text-xs font-bold text-stone-600 bg-white border border-stone-200 rounded-xl hover:bg-stone-50 transition shadow-sm w-full"
+                        >
+                          予約管理
+                        </button>
+                        <button 
+                          onClick={() => handleLessonDelete(lesson.id)} 
+                          className="py-2 text-xs font-bold text-red-600 bg-white border border-red-200 rounded-xl hover:bg-red-50 transition shadow-sm w-full"
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -558,7 +546,6 @@ function AdminContent() {
         {/* タブ2: ユーザー管理 */}
         {activeTab === 'users' && (
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-stone-200 animate-fadeIn">
-            {/* ... */}
             <div className="flex justify-end items-center mb-6">
               <button 
                 type="button"
@@ -572,118 +559,41 @@ function AdminContent() {
             {/* SP用: カード形式 */}
             <div className="md:hidden space-y-4">
               {users.map((u) => (
-                <div key={u.id} className="bg-[#FDFBF7] p-4 rounded-xl border border-stone-100 shadow-sm relative">
-                  <div className="mb-3">
-                     <div className="flex justify-between items-start">
-                        <span className="text-xs font-mono text-stone-400 bg-white px-2 py-0.5 rounded border border-stone-100">No.{u.member_number}</span>
+                <div key={u.id} className="bg-[#FDFBF7] p-4 rounded-xl border border-stone-100 shadow-sm relative flex flex-col gap-3">
+                  {/* 上段 */}
+                  <div>
+                     <div className="flex justify-between items-start mb-1">
+                        <span className="text-xs font-bold text-stone-400 bg-white px-2 py-0.5 rounded border border-stone-200">No.{u.member_number}</span>
                      </div>
-                     <h3 className="font-bold text-lg text-stone-700 mt-1 flex items-center gap-2 flex-wrap">
-                        {u.full_name || 'ゲスト'}
-                        {u.line_user_id && <span className="text-[#06C755] bg-[#06C755]/10 px-1.5 py-0.5 rounded text-[10px]">LINE</span>}
+                     <h3 className="font-bold text-lg text-stone-800 mt-1 flex items-center gap-2 flex-wrap">
+                       {u.full_name || 'ゲスト'}
+                       {/* バッジ類 */}
+                       {u.line_user_id && <span className="text-[#06C755] bg-[#06C755]/10 px-1.5 py-0.5 rounded text-[10px]">LINE</span>}
+                       {u.training_status === '受講済' && <span className="text-white bg-green-500 px-1.5 py-0.5 rounded text-[10px]">受講済</span>}
+                       {u.training_status === '受講中' && <span className="text-white bg-blue-500 px-1.5 py-0.5 rounded text-[10px]">受講中</span>}
+                       {u.tags && u.tags.length > 0 && u.tags.map(tag => (
+                         <span key={tag} className="text-stone-500 bg-white px-2 py-0.5 rounded text-[10px] border border-stone-100">#{tag}</span>
+                       ))}
                      </h3>
-                     <div className="text-sm text-stone-500 mt-1 space-y-0.5">
+                     <div className="text-sm text-stone-500 mt-2 space-y-0.5">
                        {u.email && !u.email.includes('@dummy.local') && <p className="truncate">✉️ {u.email}</p>}
                        {u.phone && <p>📞 {u.phone}</p>}
                      </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 mb-4">
-                     {u.plans ? (
-                        <span className="bg-[#FFF8E1] text-[#EEA51A] px-2 py-1 rounded text-xs font-bold border border-[#FCEFCF]">{u.plans.name}</span>
-                     ) : (
-                        <span className="bg-stone-100 text-stone-400 px-2 py-1 rounded text-xs">プラン未設定</span>
-                     )}
-                     
-                     {u.training_status === '受講済' ? (
-                        <span className="text-white bg-green-500 px-2 py-1 rounded text-xs">受講済</span>
-                      ) : u.training_status === '受講中' ? (
-                        <span className="text-white bg-blue-500 px-2 py-1 rounded text-xs">受講中</span>
-                      ) : (
-                        <span className="text-stone-400 bg-stone-100 px-2 py-1 rounded text-xs">未受講</span>
-                      )}
-
-                     {u.tags && u.tags.length > 0 && u.tags.map(tag => (
-                        <span key={tag} className="text-stone-500 bg-white px-2 py-1 rounded text-xs border border-stone-100">#{tag}</span>
-                      ))}
-                  </div>
-
-                  {/* 回数券セクション */}
-                  <div className="bg-white p-3 rounded-lg border border-stone-100 mb-3">
-                     <div className="flex justify-between items-center mb-2">
-                       <span className="text-xs font-bold text-stone-400">回数券</span>
-                       <button 
-                          type="button"
-                          onClick={() => setTicketUserId(ticketUserId === u.id ? null : u.id)}
-                          className="text-xs text-[#EEA51A] font-bold"
-                        >
-                          {ticketUserId === u.id ? '閉じる' : '+ 追加'}
-                        </button>
-                     </div>
-                     
-                     {u.user_tickets.length > 0 ? (
-                       <div className="space-y-1">
-                         {u.user_tickets.map(t => (
-                           <div key={t.id} className="flex justify-between items-center text-xs border-b border-stone-50 last:border-0 pb-1">
-                             <span className="text-stone-600">{t.ticket_name} (残{t.remaining_count})</span>
-                             <button type="button" onClick={() => handleTicketDelete(t.id)} className="text-red-300 hover:text-red-500">×</button>
-                           </div>
-                         ))}
-                       </div>
-                     ) : (
-                       <p className="text-xs text-stone-300">なし</p>
-                     )}
-
-                     {ticketUserId === u.id && (
-                        <div className="mt-2 pt-2 border-t border-stone-100 animate-fadeIn">
-                          <form onSubmit={handleTicketAdd} className="space-y-2">
-                            <input 
-                              placeholder="名称" 
-                              className="w-full p-2 text-xs border rounded bg-stone-50"
-                              required
-                              value={ticketForm.ticket_name}
-                              onChange={e => setTicketForm({...ticketForm, ticket_name: e.target.value})}
-                            />
-                            <div className="flex gap-2">
-                              <input 
-                                type="number" 
-                                placeholder="回数" 
-                                className="w-16 p-2 text-xs border rounded bg-stone-50"
-                                required
-                                value={ticketForm.remaining_count}
-                                onChange={e => setTicketForm({...ticketForm, remaining_count: Number(e.target.value)})}
-                              />
-                              <input 
-                                type="date" 
-                                className="flex-1 p-2 text-xs border rounded bg-stone-50"
-                                value={ticketForm.expires_at}
-                                onChange={e => setTicketForm({...ticketForm, expires_at: e.target.value})}
-                              />
-                            </div>
-                            <button type="submit" className="w-full bg-[#EEA51A] text-white text-xs py-2 rounded font-bold">付与する</button>
-                          </form>
-                        </div>
-                     )}
-                  </div>
-                  
-                  {u.notes && (
-                    <div className="text-xs text-stone-500 bg-stone-50 p-2 rounded mb-3">
-                      {u.notes}
-                    </div>
-                  )}
-
-                  {/* SP用アクションボタン（大きく配置・縦並び） */}
-                  <div className="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-stone-200">
+                  {/* 下段：ボタンエリア */}
+                  <div className="grid grid-cols-2 gap-3 mt-auto pt-2 border-t border-stone-200/50">
                       <button 
                         type="button"
                         onClick={() => openUserModal(u)} 
-                        className="py-2.5 text-sm font-bold text-blue-600 bg-white border border-blue-200 rounded-xl hover:bg-blue-50 transition shadow-sm w-full"
+                        className="py-2 text-xs font-bold text-blue-600 bg-white border border-blue-200 rounded-xl hover:bg-blue-50 transition shadow-sm w-full"
                       >
                         編集
                       </button>
                       <button 
                         type="button"
                         onClick={() => handleUserDelete(u.id)} 
-                        className="py-2.5 text-sm font-bold text-red-600 bg-white border border-red-200 rounded-xl hover:bg-red-50 transition shadow-sm w-full"
+                        className="py-2 text-xs font-bold text-red-600 bg-white border border-red-200 rounded-xl hover:bg-red-50 transition shadow-sm w-full"
                       >
                         削除
                       </button>
@@ -697,12 +607,9 @@ function AdminContent() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="text-sm text-stone-500 border-b border-stone-200">
-                    <th className="p-4 font-medium w-1/12">会員No.</th>
-                    <th className="p-4 font-medium w-3/12">お名前 / 連絡先</th>
-                    <th className="p-4 font-medium w-2/12">プラン・状態</th>
-                    <th className="p-4 font-medium w-3/12">回数券</th>
-                    <th className="p-4 font-medium w-2/12">備考</th>
-                    <th className="p-4 font-medium w-1/12 text-right">操作</th>
+                    <th className="p-4 font-medium w-2/12">会員No.</th>
+                    <th className="p-4 font-medium w-8/12">お名前 / 連絡先</th>
+                    <th className="p-4 font-medium w-2/12 text-right">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
@@ -712,13 +619,22 @@ function AdminContent() {
                         {u.member_number}
                       </td>
                       <td className="p-4">
-                        <div className="font-bold text-stone-700 flex items-center gap-2 text-base">
+                        <div className="font-bold text-stone-700 flex items-center gap-2 text-base flex-wrap">
                           {u.full_name || 'ゲスト'}
+                          {/* LINE連携バッジ */}
                           {u.line_user_id && (
                             <span className="text-[#06C755] bg-[#06C755]/10 px-1.5 py-0.5 rounded text-xs border border-[#06C755]/20" title="LINE連携済み">
                               LINE
                             </span>
                           )}
+                          {/* 養成講座ステータスバッジ */}
+                          {u.training_status === '受講済' && (
+                            <span className="text-white bg-green-500 px-1.5 py-0.5 rounded text-xs">受講済</span>
+                          )}
+                          {u.training_status === '受講中' && (
+                            <span className="text-white bg-blue-500 px-1.5 py-0.5 rounded text-xs">受講中</span>
+                          )}
+                          {/* タグ */}
                           {u.tags && u.tags.length > 0 && u.tags.map(tag => (
                             <span key={tag} className="text-[#EEA51A] bg-[#FFF8E1] px-1.5 py-0.5 rounded text-xs border border-[#FCEFCF]">
                               {tag}
@@ -730,92 +646,10 @@ function AdminContent() {
                           {u.phone && <div>📞 {u.phone}</div>}
                         </div>
                       </td>
-                      <td className="p-4">
-                        <div className="mb-2">
-                          {u.plans ? (
-                            <span className="bg-[#FFF8E1] text-[#EEA51A] px-2 py-1 rounded text-sm font-bold border border-[#FCEFCF] block w-fit">
-                              {u.plans.name}
-                            </span>
-                          ) : (
-                            <span className="text-stone-400 text-sm block mb-1">プラン未設定</span>
-                          )}
-                        </div>
-                        <div className="text-sm">
-                          {u.training_status === '受講済' ? (
-                            <span className="text-white bg-green-500 px-2 py-0.5 rounded-full">受講済</span>
-                          ) : u.training_status === '受講中' ? (
-                            <span className="text-white bg-blue-500 px-2 py-0.5 rounded-full">受講中</span>
-                          ) : (
-                            <span className="text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">未受講</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="space-y-2 mb-3">
-                          {u.user_tickets.map(t => (
-                            <div key={t.id} className="flex justify-between items-center text-sm bg-white border border-stone-100 p-2 rounded-lg">
-                              <span>
-                                <span className="font-bold text-stone-600">{t.ticket_name}</span>
-                                <span className="text-stone-400 ml-2">残: {t.remaining_count}回</span>
-                                <span className="text-stone-400 ml-2">期限: {t.expires_at ? new Date(t.expires_at).toLocaleDateString() : 'なし'}</span>
-                              </span>
-                              <button type="button" onClick={() => handleTicketDelete(t.id)} className="text-red-400 hover:text-red-600">×</button>
-                            </div>
-                          ))}
-                          {u.user_tickets.length === 0 && <span className="text-sm text-stone-300">なし</span>}
-                        </div>
-                        
-                        {ticketUserId === u.id ? (
-                          <div className="bg-stone-50 p-3 rounded-xl border border-stone-200">
-                            <p className="text-sm font-bold text-stone-500 mb-2">回数券を付与</p>
-                            <form onSubmit={handleTicketAdd} className="space-y-2">
-                              <input 
-                                placeholder="名称 (例: 5回券)" 
-                                className="w-full p-2 text-sm border rounded"
-                                required
-                                value={ticketForm.ticket_name}
-                                onChange={e => setTicketForm({...ticketForm, ticket_name: e.target.value})}
-                              />
-                              <div className="flex gap-2">
-                                <input 
-                                  type="number" 
-                                  placeholder="回数" 
-                                  className="w-16 p-2 text-sm border rounded"
-                                  required
-                                  value={ticketForm.remaining_count}
-                                  onChange={e => setTicketForm({...ticketForm, remaining_count: Number(e.target.value)})}
-                                />
-                                <input 
-                                  type="date" 
-                                  className="flex-1 p-2 text-sm border rounded"
-                                  value={ticketForm.expires_at}
-                                  onChange={e => setTicketForm({...ticketForm, expires_at: e.target.value})}
-                                />
-                              </div>
-                              <div className="flex gap-2">
-                                <button type="submit" className="bg-[#EEA51A] text-white text-sm px-3 py-2 rounded flex-1">付与</button>
-                                <button type="button" onClick={() => setTicketUserId(null)} className="bg-stone-200 text-stone-500 text-sm px-3 py-2 rounded">中止</button>
-                              </div>
-                            </form>
-                          </div>
-                        ) : (
-                          <button 
-                            type="button"
-                            onClick={() => setTicketUserId(u.id)}
-                            className="text-sm text-[#EEA51A] border border-[#EEA51A] px-2 py-1 rounded-full hover:bg-[#FFF8E1]"
-                          >
-                            + 追加
-                          </button>
-                        )}
-                      </td>
-                      <td className="p-4 text-sm text-stone-500 whitespace-pre-wrap">
-                        {u.notes || '-'}
-                      </td>
                       <td className="p-4 text-right">
-                        {/* PC用操作ボタン（縦並び） */}
-                        <div className="flex flex-col gap-1 justify-center items-end">
-                            <button type="button" onClick={() => openUserModal(u)} className="w-16 py-1 text-xs font-bold text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 transition">編集</button>
-                            <button type="button" onClick={() => handleUserDelete(u.id)} className="w-16 py-1 text-xs font-bold text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 transition">削除</button>
+                        <div className="flex flex-col gap-2 justify-center items-end">
+                            <button type="button" onClick={() => openUserModal(u)} className="w-16 py-1.5 text-xs font-bold text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 transition shadow-sm">編集</button>
+                            <button type="button" onClick={() => handleUserDelete(u.id)} className="w-16 py-1.5 text-xs font-bold text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 transition shadow-sm">削除</button>
                         </div>
                       </td>
                     </tr>
@@ -826,160 +660,99 @@ function AdminContent() {
           </div>
         )}
 
-        {/* タブ3: プラン管理 */}
-        {activeTab === 'plans' && (
-          <div className="grid md:grid-cols-2 gap-8 animate-fadeIn">
-            {/* プラン追加フォーム */}
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-stone-200 h-fit">
-              <h2 className="text-xl font-bold text-stone-700 mb-4">✨ 新しいプランを追加</h2>
-              <form onSubmit={handlePlanAdd} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">プラン名</label>
-                  <input
-                    required
-                    placeholder="例: マタニティヨガコース"
-                    value={newPlanName}
-                    onChange={(e) => setNewPlanName(e.target.value)}
-                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none transition"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full bg-stone-800 text-white font-bold py-3 rounded-xl hover:bg-[#EEA51A] transition shadow-md"
-                >
-                  プランを追加する
-                </button>
-              </form>
-            </div>
-
-            {/* プラン一覧 */}
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-stone-200">
-              <h2 className="text-xl font-bold text-stone-700 mb-4">📋 現在のプラン一覧</h2>
-              <ul className="space-y-2">
-                {plans.map((p) => (
-                  <li key={p.id} className="flex justify-between items-center p-3 bg-[#FDFBF7] rounded-xl border border-stone-100">
-                    <span className="font-bold text-stone-700">{p.name}</span>
-                    <button 
-                      type="button"
-                      onClick={() => handlePlanDelete(p.id)}
-                      className="text-stone-400 hover:text-red-500 p-2"
-                      title="削除"
-                    >
-                      🗑️
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {/* タブ4: お知らせ管理 */}
+        {/* タブ3: お知らせ管理 */}
         {activeTab === 'announcements' && (
-          <div className="grid md:grid-cols-2 gap-8 animate-fadeIn">
-            {/* 投稿フォーム */}
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-stone-200 h-fit">
-              <h2 className="text-xl font-bold text-stone-700 mb-4">🔔 お知らせを投稿</h2>
-              <form onSubmit={handleAnnouncementSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">タイトル</label>
-                  <input
-                    required
-                    placeholder="例: 年末年始の営業について"
-                    value={announcementForm.title}
-                    onChange={(e) => setAnnouncementForm({...announcementForm, title: e.target.value})}
-                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">本文</label>
-                  <textarea
-                    required
-                    rows={4}
-                    placeholder="お知らせの内容を入力..."
-                    value={announcementForm.content}
-                    onChange={(e) => setAnnouncementForm({...announcementForm, content: e.target.value})}
-                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">リンクURL (任意)</label>
-                  <input
-                    placeholder="https://example.com/campaign"
-                    value={announcementForm.link_url}
-                    onChange={(e) => setAnnouncementForm({...announcementForm, link_url: e.target.value})}
-                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">対象ユーザータグ (カンマ区切り)</label>
-                  <input
-                    placeholder="例: 体験, 会員 (空欄なら全員)"
-                    value={announcementForm.target_tags}
-                    onChange={(e) => setAnnouncementForm({...announcementForm, target_tags: e.target.value})}
-                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-[#EEA51A] text-white font-bold py-3 rounded-xl hover:bg-[#D99000] transition shadow-md"
-                >
-                  投稿する
-                </button>
-              </form>
+          <div className="bg-white p-8 rounded-3xl shadow-sm border border-stone-200 animate-fadeIn">
+            {/* 上部: 新規登録ボタン */}
+            <div className="flex justify-end items-center mb-6">
+              <button 
+                type="button"
+                onClick={() => openAnnouncementModal()}
+                className="bg-[#EEA51A] text-white px-4 py-2 rounded-full font-bold shadow hover:bg-[#D99000] text-sm"
+              >
+                + 新規お知らせ投稿
+              </button>
             </div>
 
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-stone-200">
+            {/* お知らせ一覧 */}
+            <div className="space-y-4">
               <h2 className="text-xl font-bold text-stone-700 mb-4">📋 配信中のお知らせ</h2>
               {announcements.length === 0 ? (
                 <p className="text-stone-400 text-sm">お知らせはありません</p>
               ) : (
                 <div className="space-y-4">
-                  {announcements.map((ann) => (
-                    <div key={ann.id} className="bg-[#FDFBF7] p-4 rounded-xl border border-stone-100 relative">
-                      <h3 className="font-bold text-stone-700 mb-1 pr-6">{ann.title}</h3>
-                      <p className="text-sm text-stone-500 whitespace-pre-wrap mb-2 line-clamp-3">{ann.content}</p>
-                      {ann.link_url && (
-                        <div className="text-xs text-[#EEA51A] underline mb-2 truncate max-w-[250px]">
-                          <a href={ann.link_url} target="_blank" rel="noopener noreferrer">
-                            {ann.link_url}
-                          </a>
+                  {announcements.map((ann) => {
+                    const targetCount = (!ann.target_tags || ann.target_tags.length === 0)
+                      ? users.length 
+                      : users.filter(u => u.tags?.some(t => ann.target_tags.includes(t))).length;
+
+                    return (
+                      <div key={ann.id} className="bg-[#FDFBF7] p-4 rounded-xl border border-stone-100 shadow-sm flex flex-col gap-3">
+                        {/* 上段 */}
+                        <div>
+                           <div className="flex justify-between items-center mb-1">
+                             <span className="text-sm font-bold text-stone-600">
+                                {new Date(ann.created_at).toLocaleDateString()}
+                             </span>
+                             <span className="text-[10px] font-bold text-stone-500 bg-white border border-stone-200 px-2 py-0.5 rounded-lg">
+                               配信対象: {targetCount}名
+                             </span>
+                           </div>
+
+                           <h3 className="font-bold text-lg text-stone-800 mb-1">{ann.title}</h3>
+                           <p className="text-sm text-stone-500 whitespace-pre-wrap mb-2 line-clamp-3">{ann.content}</p>
+                           {ann.link_url && (
+                             <div className="text-xs text-[#EEA51A] underline mb-2 truncate">
+                               <a href={ann.link_url} target="_blank" rel="noopener noreferrer">
+                                 {ann.link_url}
+                               </a>
+                             </div>
+                           )}
+                           <div className="flex gap-1 flex-wrap">
+                             {ann.target_tags && ann.target_tags.length > 0 ? (
+                               ann.target_tags.map(tag => (
+                                 <span key={tag} className="text-xs bg-white border border-stone-200 px-2 py-0.5 rounded text-stone-500">
+                                   {tag}
+                                 </span>
+                               ))
+                             ) : (
+                               <span className="text-xs bg-stone-100 px-2 py-0.5 rounded text-stone-400">全員</span>
+                             )}
+                           </div>
                         </div>
-                      )}
-                      <div className="flex gap-1 flex-wrap">
-                        {ann.target_tags && ann.target_tags.length > 0 ? (
-                          ann.target_tags.map(tag => (
-                            <span key={tag} className="text-xs bg-white border border-stone-200 px-2 py-0.5 rounded text-stone-500">
-                              {tag}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs bg-stone-100 px-2 py-0.5 rounded text-stone-400">全員</span>
-                        )}
+
+                        {/* 下段: ボタンエリア */}
+                        <div className="grid grid-cols-2 gap-3 mt-auto pt-2 border-t border-stone-200/50">
+                          <button 
+                            type="button"
+                            onClick={() => openAnnouncementModal(ann)}
+                            className="py-2 text-xs font-bold text-blue-600 bg-white border border-blue-200 rounded-xl hover:bg-blue-50 transition shadow-sm w-full"
+                          >
+                            編集
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleAnnouncementDelete(ann.id)}
+                            className="py-2 text-xs font-bold text-red-600 bg-white border border-red-200 rounded-xl hover:bg-red-50 transition shadow-sm w-full"
+                          >
+                            削除
+                          </button>
+                        </div>
                       </div>
-                      <button 
-                        type="button"
-                        onClick={() => handleAnnouncementDelete(ann.id)}
-                        className="absolute top-3 right-3 text-stone-400 hover:text-red-500"
-                        title="削除"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* ... (モーダル部分は省略せずそのまま使用) ... */}
+        {/* モーダル群 (変更なし) */}
         {reservationModalOpen && selectedLesson && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-             {/* ... (変更なし) ... */}
+             {/* ...予約管理モーダルの中身... */}
              <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl overflow-y-auto max-h-[90vh]">
-               <div className="flex justify-between items-start mb-6">
+                <div className="flex justify-between items-start mb-6">
                 <div>
                   <h3 className="text-xl font-bold text-stone-700">{selectedLesson.title}</h3>
                   <p className="text-sm text-stone-500">
@@ -989,7 +762,6 @@ function AdminContent() {
                 <button type="button" onClick={() => setReservationModalOpen(false)} className="text-stone-400 hover:text-stone-600 text-2xl">×</button>
               </div>
 
-              {/* 予約者一覧 */}
               <div className="mb-8">
                 <h4 className="font-bold text-stone-600 mb-3 border-b pb-2">
                   予約済みメンバー ({(selectedLesson as any).reservations?.length || 0}名)
@@ -1017,86 +789,83 @@ function AdminContent() {
                 )}
               </div>
 
-              {/* 手動予約追加 */}
               <div className="bg-stone-50 p-5 rounded-2xl border border-stone-200">
-  <h4 className="font-bold text-stone-600 mb-4 text-sm flex items-center gap-2">
-    <span>➕ 手動で予約を追加</span>
-  </h4>
+                <h4 className="font-bold text-stone-600 mb-4 text-sm flex items-center gap-2">
+                  <span>➕ 手動で予約を追加</span>
+                </h4>
 
-  {/* モード切替スイッチ */}
-  <div className="flex bg-stone-200 p-1 rounded-xl mb-4">
-    <button
-      onClick={() => setReserveMode('member')}
-      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${reserveMode === 'member' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500'}`}
-    >
-      登録済み会員
-    </button>
-    <button
-      onClick={() => setReserveMode('guest')}
-      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${reserveMode === 'guest' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500'}`}
-    >
-      新規ゲスト (電話等)
-    </button>
-  </div>
+                <div className="flex bg-stone-200 p-1 rounded-xl mb-4">
+                  <button
+                    onClick={() => setReserveMode('member')}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${reserveMode === 'member' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500'}`}
+                  >
+                    登録済み会員
+                  </button>
+                  <button
+                    onClick={() => setReserveMode('guest')}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${reserveMode === 'guest' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500'}`}
+                  >
+                    新規ゲスト (電話等)
+                  </button>
+                </div>
 
-  {reserveMode === 'member' ? (
-    /* 会員選択モード */
-    <div className="flex gap-2">
-      <select 
-        className="flex-1 p-3 text-sm border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none bg-white font-medium"
-        value={selectedUserIdToReserve}
-        onChange={(e) => setSelectedUserIdToReserve(e.target.value)}
-      >
-        <option value="">会員を選択...</option>
-        {users.map(u => (
-          <option key={u.id} value={u.id}>
-            {u.member_number}: {u.full_name} {u.phone ? `(${u.phone})` : ''}
-          </option>
-        ))}
-      </select>
-      <button 
-        onClick={handleManualReserve}
-        disabled={!selectedUserIdToReserve || loading}
-        className="bg-stone-800 text-white px-5 py-2 rounded-xl font-bold text-sm hover:bg-[#EEA51A] disabled:opacity-50 transition-colors"
-      >
-        追加
-      </button>
-    </div>
-  ) : (
-    /* 新規ゲスト登録モード */
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        <input
-          placeholder="お名前 (必須)"
-          className="p-3 text-sm border border-stone-200 rounded-xl focus:border-[#EEA51A] outline-none bg-white font-medium"
-          value={guestFormData.full_name}
-          onChange={e => setGuestFormData({...guestFormData, full_name: e.target.value})}
-        />
-        <input
-          placeholder="電話番号"
-          className="p-3 text-sm border border-stone-200 rounded-xl focus:border-[#EEA51A] outline-none bg-white font-medium"
-          value={guestFormData.phone}
-          onChange={e => setGuestFormData({...guestFormData, phone: e.target.value})}
-        />
-      </div>
-      <button 
-        onClick={handleManualReserve}
-        disabled={!guestFormData.full_name || loading}
-        className="w-full bg-[#EEA51A] text-white py-3 rounded-xl font-bold text-sm hover:bg-[#D99000] disabled:opacity-50 shadow-md transition-all active:scale-95"
-      >
-        ゲストとして登録・予約を確定
-      </button>
-      <p className="text-[9px] text-stone-400 text-center">※ 自動的に「ゲスト」タグ付きのユーザーとして登録されます</p>
-    </div>
-  )}
-</div>
+                {reserveMode === 'member' ? (
+                  <div className="flex gap-2">
+                    <select 
+                      className="flex-1 p-3 text-sm border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:outline-none bg-white font-medium"
+                      value={selectedUserIdToReserve}
+                      onChange={(e) => setSelectedUserIdToReserve(e.target.value)}
+                    >
+                      <option value="">会員を選択...</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.member_number}: {u.full_name} {u.phone ? `(${u.phone})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <button 
+                      onClick={handleManualReserve}
+                      disabled={!selectedUserIdToReserve || loading}
+                      className="bg-stone-800 text-white px-5 py-2 rounded-xl font-bold text-sm hover:bg-[#EEA51A] disabled:opacity-50 transition-colors"
+                    >
+                      追加
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        placeholder="お名前 (必須)"
+                        className="p-3 text-sm border border-stone-200 rounded-xl focus:border-[#EEA51A] outline-none bg-white font-medium"
+                        value={guestFormData.full_name}
+                        onChange={e => setGuestFormData({...guestFormData, full_name: e.target.value})}
+                      />
+                      <input
+                        placeholder="電話番号"
+                        className="p-3 text-sm border border-stone-200 rounded-xl focus:border-[#EEA51A] outline-none bg-white font-medium"
+                        value={guestFormData.phone}
+                        onChange={e => setGuestFormData({...guestFormData, phone: e.target.value})}
+                      />
+                    </div>
+                    <button 
+                      onClick={handleManualReserve}
+                      disabled={!guestFormData.full_name || loading}
+                      className="w-full bg-[#EEA51A] text-white py-3 rounded-xl font-bold text-sm hover:bg-[#D99000] disabled:opacity-50 shadow-md transition-all active:scale-95"
+                    >
+                      ゲストとして登録・予約を確定
+                    </button>
+                    <p className="text-[9px] text-stone-400 text-center">※ 自動的に「ゲスト」タグ付きのユーザーとして登録されます</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {/* ユーザー登録・編集モーダル */}
+        {/* ユーザー登録・編集モーダル (変更なし) */}
         {userModalOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+             {/* ...ユーザーモーダルの中身... */}
             <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl overflow-y-auto max-h-[90vh]">
               <h3 className="text-xl font-bold text-stone-700 mb-6">
                 {editingUser ? 'ユーザー編集' : '新規ユーザー登録'}
@@ -1131,7 +900,6 @@ function AdminContent() {
                     />
                   </div>
                   
-                  {/* Emailは任意化 */}
                   <div>
                     <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">Email</label>
                     <input
@@ -1143,7 +911,6 @@ function AdminContent() {
                     />
                   </div>
 
-                  {/* 電話番号 */}
                   <div>
                     <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">電話番号</label>
                     <input
@@ -1155,21 +922,7 @@ function AdminContent() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">プラン</label>
-                      <select
-                        value={userFormData.plan_id}
-                        onChange={(e) => setUserFormData({...userFormData, plan_id: e.target.value})}
-                        className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                      >
-                        <option value="">プランなし</option>
-                        {plans.map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
+                  <div>
                       <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">養成講座ステータス</label>
                       <select
                         value={userFormData.training_status}
@@ -1180,10 +933,8 @@ function AdminContent() {
                         <option value="受講中">受講中</option>
                         <option value="受講済">受講済</option>
                       </select>
-                    </div>
                   </div>
 
-                  {/* ユーザータグ入力欄 */}
                   <div>
                     <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">ユーザータグ (カンマ区切り)</label>
                     <input
@@ -1191,17 +942,6 @@ function AdminContent() {
                       onChange={(e) => setUserFormData({...userFormData, tags: e.target.value})}
                       placeholder="例: 体験, キャンペーン, 会員"
                       className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">備考</label>
-                    <textarea
-                      rows={3}
-                      value={userFormData.notes}
-                      onChange={(e) => setUserFormData({...userFormData, notes: e.target.value})}
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
-                      placeholder="メモを入力..."
                     />
                   </div>
                   
@@ -1223,6 +963,76 @@ function AdminContent() {
                   </div>
                 </form>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ★追加: お知らせ登録・編集モーダル */}
+        {announcementModalOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl overflow-y-auto max-h-[90vh]">
+              <h3 className="text-xl font-bold text-stone-700 mb-6">
+                {editingAnnouncementId ? 'お知らせ編集' : '新規お知らせ投稿'}
+              </h3>
+              
+              <form onSubmit={handleAnnouncementSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">タイトル</label>
+                  <input
+                    required
+                    placeholder="例: 年末年始の営業について"
+                    value={announcementForm.title}
+                    onChange={(e) => setAnnouncementForm({...announcementForm, title: e.target.value})}
+                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">本文</label>
+                  <textarea
+                    required
+                    rows={6}
+                    placeholder="お知らせの内容を入力..."
+                    value={announcementForm.content}
+                    onChange={(e) => setAnnouncementForm({...announcementForm, content: e.target.value})}
+                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">リンクURL (任意)</label>
+                  <input
+                    placeholder="https://example.com/campaign"
+                    value={announcementForm.link_url}
+                    onChange={(e) => setAnnouncementForm({...announcementForm, link_url: e.target.value})}
+                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-stone-500 mb-1 ml-1">対象ユーザータグ (カンマ区切り)</label>
+                  <input
+                    placeholder="例: 体験, 会員 (空欄なら全員)"
+                    value={announcementForm.target_tags}
+                    onChange={(e) => setAnnouncementForm({...announcementForm, target_tags: e.target.value})}
+                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl focus:border-[#EEA51A] focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setAnnouncementModalOpen(false)}
+                    className="flex-1 bg-stone-100 text-stone-500 font-bold py-3 rounded-xl hover:bg-stone-200"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 bg-[#EEA51A] text-white font-bold py-3 rounded-xl hover:bg-[#D99000] disabled:opacity-50"
+                  >
+                    {loading ? '処理中...' : editingAnnouncementId ? '更新する' : '投稿する'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
