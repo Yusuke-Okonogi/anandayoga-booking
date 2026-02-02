@@ -185,6 +185,11 @@ export default function MobileHeader() {
               <Link 
                 key={item.href}
                 href={item.href}
+                // 同一ページ内の遷移をスムーズにするための設定
+                scroll={item.href.startsWith("/#")} 
+                onClick={() => {
+                  setIsMenuOpen(false); // メニューを閉じる
+                }}
                 className="flex items-center justify-center py-4 px-2 bg-white rounded-xl border border-stone-200 text-stone-600 text-[13px] font-bold shadow-sm active:scale-95 transition-transform"
               >
                 {item.label}
