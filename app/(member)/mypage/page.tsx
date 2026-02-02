@@ -74,9 +74,16 @@ export default function MyPage() {
           new Date(a.lessons.start_time).getTime() - new Date(b.lessons.start_time).getTime()
         );
         
-        setReservations(sortedReservations);
-
+        // ★修正: 現在時刻を取得し、未来の予約のみフィルタリングして表示用stateにセット
         const now = new Date();
+        const futureReservations = sortedReservations.filter(res => {
+            const lessonDate = new Date(res.lessons.start_time);
+            return lessonDate > now; // 終了したレッスンは除外
+        });
+        
+        setReservations(futureReservations);
+
+        // 今月の利用回数の計算（こちらは過去分も含める）
         const start = startOfMonth(now);
         const end = endOfMonth(now);
         
@@ -164,6 +171,7 @@ export default function MyPage() {
     } else {
       alert('予約をキャンセルしました');
       setReservations(reservations.filter(r => r.id !== reservationId));
+      // キャンセルしたら月間利用回数も減らす（ただし過去の予約キャンセルは考慮不要なため簡易的に）
       setMonthlyCount(prev => Math.max(0, prev - 1));
     }
   };
@@ -222,7 +230,7 @@ export default function MyPage() {
           <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-yellow-300 opacity-20 rounded-full -ml-10 -mb-10 blur-3xl"></div>
 
-          {/* ★修正: RYT200リボン (より目立つデザイン) */}
+          {/* RYT200リボン */}
           {profile?.training_status === '受講済' && (
             <div className="absolute top-0 right-0 w-28 h-28 overflow-hidden z-20 rounded-tr-3xl pointer-events-none">
               <div className="absolute top-[20px] -right-[30px] w-[140px] bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-300 text-amber-900 shadow-lg text-center py-1.5 rotate-45 font-bold text-xs tracking-widest border border-white/40">
@@ -241,19 +249,19 @@ export default function MyPage() {
 
               {/* 右側：利用状況 */}
               <div className="flex flex-col gap-4 flex-grow h-full">
-                 <div className="bg-white/95 px-4 rounded-xl shadow-sm flex-1 flex flex-col justify-center">
+                  <div className="bg-white/95 px-4 rounded-xl shadow-sm flex-1 flex flex-col justify-center">
                     <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-0.5">今月の利用</p>
                     <p className="font-bold text-xl text-stone-700 leading-none">
                       {monthlyCount} <span className="text-xs font-normal text-stone-400">回</span>
                     </p>
-                 </div>
-                 
-                 <div className="bg-white/95 px-4 rounded-xl shadow-sm flex-1 flex flex-col justify-center">
+                  </div>
+                  
+                  <div className="bg-white/95 px-4 rounded-xl shadow-sm flex-1 flex flex-col justify-center">
                     <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-0.5">回数券残り</p>
                     <p className="font-bold text-xl text-[#EEA51A] leading-none">
                       {tickets.reduce((acc, t) => acc + t.remaining_count, 0)} <span className="text-xs font-normal text-stone-400">回</span>
                     </p>
-                 </div>
+                  </div>
               </div>
             </div>
             

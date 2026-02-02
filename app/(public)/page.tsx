@@ -91,7 +91,7 @@ export default async function HomePage() {
   
   return (
     // ▼ ページ全体を包むコンテナ
-    <div className="min-h-screen w-full bg-[#333] relative bg-[url('/img/bg_main.jpg')] bg-fixed bg-center bg-cover">
+    <div className="min-h-screen w-full bg-[#333] relative bg-[url('/img/bg_main2.jpg')] bg-fixed bg-center bg-cover">
       
 
       {/* ▼▼▼ スマホ幅コンテンツエリア（S中央寄せ） ▼▼▼ */}
