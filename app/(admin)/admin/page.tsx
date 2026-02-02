@@ -400,7 +400,7 @@ function AdminContent() {
             href="/admin/checkin" 
             className="bg-stone-800 text-white px-6 py-3 rounded-full font-bold shadow-md hover:bg-[#EEA51A] transition flex items-center gap-2 text-sm"
           >
-            📋 予約・チェックイン画面へ
+            📋 チェックインへ
           </Link>
         </div>
 
